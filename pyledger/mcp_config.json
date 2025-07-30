@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "pyledger": {
+      "command": "python",
+      "args": ["-m", "pyledger.mcp_server"],
+      "env": {
+        "PYTHONPATH": "."
+      }
+    }
+  }
+} 
