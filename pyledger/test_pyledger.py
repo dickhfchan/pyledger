@@ -1,8 +1,8 @@
 import os
 import json
-from accounts import AccountType, ChartOfAccounts
-from journal import JournalLine, JournalEntry, Ledger
-from reports import balance_sheet, income_statement, cash_flow_report
+from pyledger.accounts import AccountType, ChartOfAccounts
+from pyledger.journal import JournalLine, JournalEntry, Ledger
+from pyledger.reports import balance_sheet, income_statement, cash_flow_report
 
 ACCOUNTS_FILE = 'test_accounts.json'
 ENTRIES_FILE = 'test_entries.json'
@@ -36,8 +36,8 @@ def test_save_load(chart, ledger):
     with open(ENTRIES_FILE, 'w') as f:
         json.dump(ledger.to_dict(), f, indent=2)
     # Load
-    from accounts import ChartOfAccounts
-    from journal import Ledger
+    from pyledger.accounts import ChartOfAccounts
+    from pyledger.journal import Ledger
     with open(ACCOUNTS_FILE, 'r') as f:
         loaded_chart = ChartOfAccounts.from_dict(json.load(f))
     with open(ENTRIES_FILE, 'r') as f:

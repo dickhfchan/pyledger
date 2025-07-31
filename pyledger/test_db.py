@@ -1,5 +1,5 @@
-from db import get_connection, init_db, add_account, list_accounts, add_journal_entry, list_journal_entries, get_journal_lines
-from accounts import AccountType
+from pyledger.db import get_connection, init_db, add_account, list_accounts, add_journal_entry, list_journal_entries, get_journal_lines
+from pyledger.accounts import AccountType
 import os
 
 DB_FILE = 'pyledger.db'
