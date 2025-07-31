@@ -7,10 +7,10 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 | **Feature** | **PyLedger** | **Python-Accounting** | **Comparison** |
 |-------------|--------------|----------------------|----------------|
 | **Double-Entry Bookkeeping** | ✅ Full implementation | ✅ Full implementation | **Equal** - Both implement proper double-entry accounting |
-| **Chart of Accounts** | ✅ Basic structure | ✅ Comprehensive with categorization | **Python-Accounting Advantage** - More detailed account management |
-| **Multi-Entity Support** | ❌ Not implemented | ✅ Full multi-entity support | **Python-Accounting Advantage** - Multi-company capabilities |
-| **Transaction Types** | ✅ Basic journal entries | ✅ Comprehensive transaction types | **Python-Accounting Advantage** - CashSale, ClientInvoice, CashPurchase, SupplierBill, etc. |
-| **Opening Balances** | ❌ Not implemented | ✅ Full opening balance support | **Python-Accounting Advantage** - Historical balance management |
+| **Chart of Accounts** | ✅ Enhanced with opening balances | ✅ Comprehensive with categorization | **Equal** - Both have comprehensive account management |
+| **Multi-Entity Support** | ✅ Full multi-entity support | ✅ Full multi-entity support | **Equal** - Both support multiple entities/companies |
+| **Transaction Types** | ✅ Cash sales, purchases, opening balances | ✅ Comprehensive transaction types | **Equal** - Both support multiple transaction types |
+| **Opening Balances** | ✅ Full opening balance support | ✅ Full opening balance support | **Equal** - Both support opening balances |
 
 ## **📋 Business Document Management**
 
@@ -18,7 +18,7 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 |-------------|--------------|----------------------|----------------|
 | **Customer Invoices** | ✅ Full system with PDF generation | ✅ ClientInvoice with line items | **Equal** - Both have complete invoice systems |
 | **Vendor Bills** | ✅ Purchase orders with receipts | ✅ SupplierBill with line items | **Equal** - Both handle vendor transactions |
-| **Cash Transactions** | ✅ Basic journal entries | ✅ CashSale, CashPurchase | **Python-Accounting Advantage** - Dedicated cash transaction types |
+| **Cash Transactions** | ✅ CashSale, CashPurchase | ✅ CashSale, CashPurchase | **Equal** - Both have dedicated cash transaction types |
 | **Credit Transactions** | ✅ Basic journal entries | ✅ ClientInvoice, SupplierBill | **Python-Accounting Advantage** - Dedicated credit transaction types |
 | **Receipts & Payments** | ✅ Basic payment tracking | ✅ ClientReceipt with assignment | **Python-Accounting Advantage** - Advanced payment assignment |
 
@@ -45,8 +45,8 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 
 | **Feature** | **PyLedger** | **Python-Accounting** | **Comparison** |
 |-------------|--------------|----------------------|----------------|
-| **Multi-Entity** | ❌ Not implemented | ✅ Full multi-entity support | **Python-Accounting Advantage** - Enterprise multi-company |
-| **Tax Management** | ✅ Basic tax rates | ✅ Comprehensive tax system | **Python-Accounting Advantage** - Advanced tax handling |
+| **Multi-Entity** | ✅ Full multi-entity support | ✅ Full multi-entity support | **Equal** - Both support multiple entities |
+| **Tax Management** | ✅ Basic tax calculations | ✅ Comprehensive tax system | **Python-Accounting Advantage** - Advanced tax handling |
 | **Transaction Protection** | ✅ Basic validation | ✅ Tamper-proof ledger | **Python-Accounting Advantage** - Data integrity protection |
 | **Audit Trail** | ✅ Basic logging | ✅ Comprehensive audit system | **Python-Accounting Advantage** - Professional audit compliance |
 
@@ -93,6 +93,7 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 
 #### **🎯 Modern Architecture**
 - **Headless Design**: API-first approach with CLI and MCP interfaces
+- **Multi-Entity Support**: Full support for multiple companies/organizations
 - **Lightweight**: Simple SQLite database, easy deployment
 - **Developer-Friendly**: Full programmatic access and automation
 - **AI Integration**: Built-in MCP server for AI assistant interaction
@@ -104,6 +105,10 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 - **Open Source**: MIT license with full code access
 
 #### **📋 Business Features**
+- **Enhanced Account Management**: Opening balances with dates and comprehensive structure
+- **Comprehensive Transaction Types**: Cash sales, purchases, opening balances, and journal entries
+- **Advanced Journal Entries**: Narration, quantity tracking, unit prices, and tax rates
+- **Tax Handling**: Automatic tax calculations with dedicated tax accounts
 - **Invoice Management**: Complete invoice system with PDF generation
 - **Purchase Order Management**: Full purchase order system with receipts
 - **Payment Tracking**: Basic payment recording and tracking
@@ -141,15 +146,18 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 
 #### **🏢 Small to Medium Businesses**
 - **Budget-Conscious**: Looking for cost-effective accounting solution
-- **Simple Requirements**: Basic double-entry accounting without complex features
+- **Enhanced Requirements**: Need multi-entity support and advanced transaction types
 - **Technical Staff**: Have developers who can work with APIs and CLI
 - **Rapid Deployment**: Need quick setup and deployment
+- **Tax Compliance**: Require basic tax handling and calculations
 
 #### **🔧 Specific Use Cases**
 - **Microservices Architecture**: Need accounting as a service component
+- **Multi-Entity Operations**: Managing multiple companies or organizations
 - **Headless Applications**: Building applications without web interfaces
 - **Automation Projects**: Integrating accounting with other business processes
 - **AI-Powered Accounting**: Using AI assistants for financial management
+- **Enhanced Transaction Types**: Need cash sales, purchases, and opening balances
 
 ### **Choose Python-Accounting for:**
 
@@ -184,8 +192,10 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 2. **Enhanced Reporting**: Improve financial reporting with drill-down
 3. **User Management**: Add role-based access control
 4. **Bank Reconciliation**: Implement basic bank reconciliation
-5. **Tax Management**: Add comprehensive tax handling
+5. **Advanced Tax Management**: Expand tax handling capabilities
 6. **Web Interface**: Develop basic web dashboard
+7. **Asset Management**: Add fixed asset tracking and depreciation
+8. **Budget Management**: Implement budget planning and tracking
 
 ### **Python-Accounting Development Focus**
 1. **Enhanced Reporting**: Improving IFRS/GAAP compliance
@@ -216,11 +226,12 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 
 PyLedger excels as a **modern, developer-friendly accounting system** that prioritizes:
 
-- **🎯 Simplicity**: Clean, focused accounting without complexity
+- **🎯 Enhanced Functionality**: Multi-entity support with advanced transaction types
 - **🔧 Automation**: Programmatic access for custom workflows
 - **🤖 AI Integration**: Built-in support for AI assistants
 - **💻 Developer Experience**: Modern Python with comprehensive APIs
 - **📦 Lightweight**: Easy deployment and minimal resource usage
+- **📊 Advanced Features**: Opening balances, tax handling, and comprehensive journal entries
 
 ### **Python-Accounting: The Professional Standards Choice**
 
@@ -237,7 +248,9 @@ Python-Accounting dominates as a **professional accounting library** offering:
 **Choose PyLedger if you need:**
 - ✅ Programmatic access to accounting data
 - ✅ AI assistant integration
-- ✅ Simple, focused accounting
+- ✅ Multi-entity support
+- ✅ Enhanced transaction types (cash sales, purchases, opening balances)
+- ✅ Advanced journal entries with narration and tax rates
 - ✅ Cost-effective solution
 - ✅ Custom development capabilities
 - ✅ REST API and CLI interfaces
