@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyledger"
+version = "1.0.0"
+description = "A Python-based double-entry accounting system with invoice and purchase order management"
+readme = "README.md"
+license = "MIT"
+authors = [
+    {name = "Dick Chan", email = "dickchan@example.com"}
+]
+maintainers = [
+    {name = "Dick Chan", email = "dickchan@example.com"}
+]
+keywords = ["accounting", "double-entry", "invoice", "purchase-order", "financial"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Accounting",
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+    "mcp>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/dickhfchan/pyledger"
+Repository = "https://github.com/dickhfchan/pyledger"
+Documentation = "https://github.com/dickhfchan/pyledger#readme"
+Issues = "https://github.com/dickhfchan/pyledger/issues"
+
+[project.scripts]
+pyledger = "pyledger.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pyledger*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py312', 'py313']
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["pyledger"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short" 

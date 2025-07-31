@@ -17,8 +17,10 @@ A comprehensive, headless Python accounting application that implements double-e
 ## Installation
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.12+ (required for modern type hints and features)
 - pip
+
+**Note**: This project requires Python 3.12 or higher to take advantage of modern Python features, improved type hints, and better performance. The CI/CD pipeline tests against Python 3.12 and 3.13.
 
 ### Setup
 ```bash
@@ -31,7 +33,7 @@ python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
-pip install fastapi uvicorn pydantic mcp
+pip install -e .
 ```
 
 ## Usage
