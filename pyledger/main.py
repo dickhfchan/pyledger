@@ -1,12 +1,14 @@
 import argparse
 import json
-from accounts import AccountType, ChartOfAccounts
-from journal import JournalLine, JournalEntry, Ledger
-from reports import balance_sheet, income_statement, cash_flow_report
-from db import (
+from pyledger.accounts import AccountType, ChartOfAccounts
+from pyledger.journal import JournalLine, JournalEntry, Ledger
+from pyledger.reports import balance_sheet, income_statement, cash_flow_report
+from pyledger.db import (
     get_connection, init_db, add_account as db_add_account, list_accounts as db_list_accounts,
     add_journal_entry as db_add_journal_entry, list_journal_entries as db_list_journal_entries,
-    get_journal_lines as db_get_journal_lines
+    get_journal_lines as db_get_journal_lines,
+    add_invoice, get_invoice, list_invoices, get_invoice_lines, update_invoice_payment,
+    add_purchase_order, get_purchase_order, list_purchase_orders, get_purchase_order_lines, update_purchase_order_receipt
 )
 
 ACCOUNT_TYPE_CHOICES = [t.name for t in AccountType]
@@ -155,6 +157,144 @@ def db_init_cmd():
     print('Database initialized.')
     conn.close()
 
+# --- Invoice CLI Functions ---
+def db_add_invoice_interactive():
+    conn = get_connection()
+    invoice_number = input('Invoice number: ')
+    customer_name = input('Customer name: ')
+    customer_address = input('Customer address: ')
+    issue_date = input('Issue date (YYYY-MM-DD): ')
+    due_date = input('Due date (YYYY-MM-DD): ')
+    notes = input('Notes (optional): ')
+    
+    lines = []
+    while True:
+        description = input('Item description (or blank to finish): ')
+        if not description:
+            break
+        quantity = float(input('Quantity: '))
+        unit_price = float(input('Unit price: '))
+        tax_rate = float(input('Tax rate (0.0-1.0): '))
+        lines.append((description, quantity, unit_price, tax_rate))
+    
+    if not lines:
+        print('Error: Invoice must have at least one line.')
+        conn.close()
+        return
+    
+    add_invoice(conn, invoice_number, customer_name, customer_address, issue_date, due_date, 'Draft', notes, lines)
+    print('Invoice added to database.')
+    conn.close()
+
+def db_list_invoices_cmd():
+    conn = get_connection()
+    print('Invoices in database:')
+    for row in list_invoices(conn):
+        print(f"{row[0]}: {row[1]} - {row[5]} - ${row[9]:.2f}")
+    conn.close()
+
+def db_get_invoice_cmd():
+    conn = get_connection()
+    invoice_number = input('Invoice number: ')
+    row = get_invoice(conn, invoice_number)
+    if not row:
+        print('Invoice not found.')
+        conn.close()
+        return
+    
+    print(f'Invoice: {row[0]}')
+    print(f'Customer: {row[1]}')
+    print(f'Address: {row[2]}')
+    print(f'Issue date: {row[3]}')
+    print(f'Due date: {row[4]}')
+    print(f'Status: {row[5]}')
+    print(f'Total: ${row[9]:.2f}')
+    print(f'Paid: ${row[10]:.2f}')
+    print(f'Balance: ${row[9] - row[10]:.2f}')
+    
+    print('\nInvoice lines:')
+    for line_row in get_invoice_lines(conn, invoice_number):
+        print(f"  {line_row[1]}: {line_row[2]} x ${line_row[3]:.2f} = ${line_row[6]:.2f}")
+    
+    conn.close()
+
+def db_record_invoice_payment_cmd():
+    conn = get_connection()
+    invoice_number = input('Invoice number: ')
+    paid_amount = float(input('Paid amount: '))
+    update_invoice_payment(conn, invoice_number, paid_amount, '')
+    print('Payment recorded.')
+    conn.close()
+
+# --- Purchase Order CLI Functions ---
+def db_add_purchase_order_interactive():
+    conn = get_connection()
+    po_number = input('Purchase order number: ')
+    supplier_name = input('Supplier name: ')
+    supplier_address = input('Supplier address: ')
+    order_date = input('Order date (YYYY-MM-DD): ')
+    expected_delivery_date = input('Expected delivery date (YYYY-MM-DD): ')
+    notes = input('Notes (optional): ')
+    
+    lines = []
+    while True:
+        description = input('Item description (or blank to finish): ')
+        if not description:
+            break
+        quantity = float(input('Quantity: '))
+        unit_price = float(input('Unit price: '))
+        tax_rate = float(input('Tax rate (0.0-1.0): '))
+        lines.append((description, quantity, unit_price, tax_rate))
+    
+    if not lines:
+        print('Error: Purchase order must have at least one line.')
+        conn.close()
+        return
+    
+    add_purchase_order(conn, po_number, supplier_name, supplier_address, order_date, expected_delivery_date, 'Draft', notes, lines)
+    print('Purchase order added to database.')
+    conn.close()
+
+def db_list_purchase_orders_cmd():
+    conn = get_connection()
+    print('Purchase orders in database:')
+    for row in list_purchase_orders(conn):
+        print(f"{row[0]}: {row[1]} - {row[5]} - ${row[9]:.2f}")
+    conn.close()
+
+def db_get_purchase_order_cmd():
+    conn = get_connection()
+    po_number = input('Purchase order number: ')
+    row = get_purchase_order(conn, po_number)
+    if not row:
+        print('Purchase order not found.')
+        conn.close()
+        return
+    
+    print(f'Purchase Order: {row[0]}')
+    print(f'Supplier: {row[1]}')
+    print(f'Address: {row[2]}')
+    print(f'Order date: {row[3]}')
+    print(f'Expected delivery: {row[4]}')
+    print(f'Status: {row[5]}')
+    print(f'Total: ${row[9]:.2f}')
+    print(f'Received: ${row[12]:.2f}')
+    
+    print('\nPurchase order lines:')
+    for line_row in get_purchase_order_lines(conn, po_number):
+        print(f"  {line_row[1]}: {line_row[2]} x ${line_row[3]:.2f} (received: {line_row[5]})")
+    
+    conn.close()
+
+def db_record_purchase_order_receipt_cmd():
+    conn = get_connection()
+    po_number = input('Purchase order number: ')
+    line_id = int(input('Line ID: '))
+    received_quantity = float(input('Received quantity: '))
+    update_purchase_order_receipt(conn, po_number, line_id, received_quantity, '')
+    print('Receipt recorded.')
+    conn.close()
+
 def main():
     parser = argparse.ArgumentParser(description='PyLedger Accounting CLI')
     subparsers = parser.add_subparsers(dest='command')
@@ -176,6 +316,16 @@ def main():
     subparsers.add_parser('db-add-entry', help='Add a new journal entry to the database')
     subparsers.add_parser('db-list-entries', help='List all journal entries in the database')
     subparsers.add_parser('db-entry-lines', help='Show lines for a specific journal entry in the database')
+    # Invoice commands
+    subparsers.add_parser('db-add-invoice', help='Add a new invoice to the database')
+    subparsers.add_parser('db-list-invoices', help='List all invoices in the database')
+    subparsers.add_parser('db-get-invoice', help='Get details for a specific invoice')
+    subparsers.add_parser('db-record-invoice-payment', help='Record a payment for an invoice')
+    # Purchase order commands
+    subparsers.add_parser('db-add-po', help='Add a new purchase order to the database')
+    subparsers.add_parser('db-list-pos', help='List all purchase orders in the database')
+    subparsers.add_parser('db-get-po', help='Get details for a specific purchase order')
+    subparsers.add_parser('db-record-po-receipt', help='Record receipt of items for a purchase order')
 
     args = parser.parse_args()
 
@@ -220,6 +370,24 @@ def main():
         db_list_entries_cmd()
     elif args.command == 'db-entry-lines':
         db_entry_lines_cmd()
+    # Invoice commands
+    elif args.command == 'db-add-invoice':
+        db_add_invoice_interactive()
+    elif args.command == 'db-list-invoices':
+        db_list_invoices_cmd()
+    elif args.command == 'db-get-invoice':
+        db_get_invoice_cmd()
+    elif args.command == 'db-record-invoice-payment':
+        db_record_invoice_payment_cmd()
+    # Purchase order commands
+    elif args.command == 'db-add-po':
+        db_add_purchase_order_interactive()
+    elif args.command == 'db-list-pos':
+        db_list_purchase_orders_cmd()
+    elif args.command == 'db-get-po':
+        db_get_purchase_order_cmd()
+    elif args.command == 'db-record-po-receipt':
+        db_record_purchase_order_receipt_cmd()
     else:
         parser.print_help()
 

@@ -7,6 +7,8 @@ A comprehensive, headless Python accounting application that implements double-e
 - **Double-Entry Accounting**: Full implementation of double-entry bookkeeping principles
 - **Chart of Accounts**: Comprehensive account management with standard accounting categories
 - **Journal Entries**: Transaction recording with automatic balance validation
+- **Invoice Management**: Complete invoice system with customer management, line items, and payment tracking
+- **Purchase Order Management**: Full purchase order system with supplier management, receipt tracking, and status management
 - **Financial Reports**: Balance Sheet, Income Statement, and Cash Flow reporting
 - **Multiple Interfaces**: CLI, REST API, and MCP server for AI assistant integration
 - **Database Persistence**: SQLite database with automatic balance updates
@@ -55,6 +57,30 @@ python3 -m pyledger.main db-list-entries
 # View entry details
 python3 -m pyledger.main db-entry-lines <entry_id>
 
+# Add invoice
+python3 -m pyledger.main db-add-invoice
+
+# List invoices
+python3 -m pyledger.main db-list-invoices
+
+# Get invoice details
+python3 -m pyledger.main db-get-invoice
+
+# Record invoice payment
+python3 -m pyledger.main db-record-invoice-payment
+
+# Add purchase order
+python3 -m pyledger.main db-add-po
+
+# List purchase orders
+python3 -m pyledger.main db-list-pos
+
+# Get purchase order details
+python3 -m pyledger.main db-get-po
+
+# Record purchase order receipt
+python3 -m pyledger.main db-record-po-receipt
+
 # Run accounting tests
 python3 -m pyledger.accounting_tests
 ```
@@ -77,6 +103,20 @@ uvicorn pyledger.api:app --reload --host 0.0.0.0 --port 8000
 - `GET /journal_entries` - List all journal entries
 - `POST /journal_entries` - Create new journal entry
 - `GET /journal_entries/{id}` - Get journal entry details
+
+**Invoices**
+- `GET /invoices` - List all invoices
+- `POST /invoices` - Create new invoice
+- `GET /invoices/{invoice_number}` - Get invoice details
+- `GET /invoices/{invoice_number}/lines` - Get invoice line items
+- `POST /invoices/{invoice_number}/payment` - Record invoice payment
+
+**Purchase Orders**
+- `GET /purchase_orders` - List all purchase orders
+- `POST /purchase_orders` - Create new purchase order
+- `GET /purchase_orders/{po_number}` - Get purchase order details
+- `GET /purchase_orders/{po_number}/lines` - Get purchase order line items
+- `POST /purchase_orders/{po_number}/receipt` - Record purchase order receipt
 
 **Reports**
 - `GET /reports/balance_sheet` - Generate balance sheet
@@ -104,7 +144,44 @@ curl -X POST "http://localhost:8000/journal_entries" \
 
 # Get balance sheet
 curl "http://localhost:8000/reports/balance_sheet"
-```
+
+# Create an invoice
+curl -X POST "http://localhost:8000/invoices" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "invoice_number": "INV-001",
+    "customer_name": "Acme Corp",
+    "customer_address": "123 Main St, City, State",
+    "issue_date": "2024-01-15",
+    "due_date": "2024-02-15",
+    "lines": [
+      {"description": "Web Development Services", "quantity": 40, "unit_price": 100.0, "tax_rate": 0.1}
+    ]
+  }'
+
+# Record invoice payment
+curl -X POST "http://localhost:8000/invoices/INV-001/payment" \
+  -H "Content-Type: application/json" \
+  -d '{"paid_amount": 4400.0}'
+
+# Create a purchase order
+curl -X POST "http://localhost:8000/purchase_orders" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "po_number": "PO-001",
+    "supplier_name": "Office Supplies Co",
+    "supplier_address": "456 Business Ave, City, State",
+    "order_date": "2024-01-10",
+    "expected_delivery_date": "2024-01-20",
+    "lines": [
+      {"description": "Office Chairs", "quantity": 5, "unit_price": 200.0, "tax_rate": 0.08}
+    ]
+  }'
+
+# Record purchase order receipt
+curl -X POST "http://localhost:8000/purchase_orders/PO-001/receipt" \
+  -H "Content-Type: application/json" \
+  -d '{"line_id": 1, "received_quantity": 3}'
 
 ### MCP Server
 
@@ -117,9 +194,26 @@ python3 -m pyledger.mcp_server
 
 #### Available MCP Tools
 
+**Accounts & Journal Entries**
 - `list_accounts` - List all accounts
 - `add_account` - Create new account
 - `add_journal_entry` - Create journal entry
+- `list_journal_entries` - List all journal entries
+- `get_journal_lines` - Get journal entry details
+
+**Invoices**
+- `add_invoice` - Create new invoice
+- `list_invoices` - List all invoices
+- `get_invoice` - Get invoice details
+- `record_invoice_payment` - Record invoice payment
+
+**Purchase Orders**
+- `add_purchase_order` - Create new purchase order
+- `list_purchase_orders` - List all purchase orders
+- `get_purchase_order` - Get purchase order details
+- `record_purchase_order_receipt` - Record purchase order receipt
+
+**Reports**
 - `balance_sheet` - Generate balance sheet
 - `income_statement` - Generate income statement
 - `cash_flow_report` - Generate cash flow report
@@ -130,6 +224,8 @@ python3 -m pyledger.mcp_server
 pyledger/
 ├── accounts.py          # Account and Chart of Accounts classes
 ├── journal.py           # Journal entries and ledger
+├── invoices.py          # Invoice management system
+├── purchase_orders.py   # Purchase order management system
 ├── reports.py           # Financial reporting functions
 ├── db.py               # Database operations
 ├── api.py              # FastAPI REST API
