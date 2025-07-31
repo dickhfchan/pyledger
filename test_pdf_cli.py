@@ -21,7 +21,7 @@ def test_pdf_generation_cli():
         ("Domain Registration", 1, 50.0, 0.0)
     ]
     
-    add_invoice(conn, "TEST-INV-003", "Test Customer", "123 Test St\nTest City, TC 12345",
+    add_invoice(conn, "TEST-INV-004", "Test Customer", "123 Test St\nTest City, TC 12345",
                 "2024-01-15", "2024-02-15", "Draft", "Test invoice for PDF generation", lines)
     
     print("✅ Test invoice created in database")
@@ -35,7 +35,7 @@ def test_pdf_generation_cli():
     
     def mock_input(prompt):
         if "Invoice number" in prompt:
-            return "TEST-INV-003"
+            return "TEST-INV-004"
         elif "Company name" in prompt:
             return "Test Company"
         elif "Company address" in prompt:

@@ -218,13 +218,28 @@ class Invoice:
             spaceAfter=2
         )
         
-        # Header section with two-column layout
+        # Header section with logo area and invoice title
+        # Create a logo placeholder (circle with company initial)
+        logo_style = ParagraphStyle(
+            'Logo',
+            parent=styles['Normal'],
+            fontSize=16,
+            fontName='Helvetica-Bold',
+            textColor=colors.white,
+            alignment=TA_CENTER
+        )
+        
+        # Logo placeholder (circle with company initial)
+        company_initial = company_info['name'][0].upper() if company_info['name'] else 'C'
+        logo_text = f"<b>{company_initial}</b>"
+        
+        # Header with logo on left, invoice details on right
         header_data = [
             [
-                # Left column - Logo placeholder and company info
-                Paragraph(f"<b>{company_info['name']}</b><br/>{company_info['address']}<br/>Phone: {company_info['phone']}<br/>Email: {company_info['email']}<br/>Website: {company_info['website']}", normal_style),
+                # Left column - Logo and company info
+                Paragraph(f"{logo_text}<br/><br/><b>{company_info['name']}</b><br/>{company_info['address']}<br/>{company_info['email']}", normal_style),
                 # Right column - Invoice title and details
-                Paragraph(f"<b>INVOICE</b><br/><br/>Invoice Number: {self.invoice_number}<br/>Issue Date: {self.issue_date.strftime('%B %d, %Y')}<br/>Due Date: {self.due_date.strftime('%B %d, %Y')}<br/>Status: {self.status.value}", normal_style)
+                Paragraph(f"<b>INVOICE</b><br/><br/>Invoice Number: {self.invoice_number}<br/>Invoice Date: {self.issue_date.strftime('%B %d, %Y')}<br/>Payment Due: {self.due_date.strftime('%B %d, %Y')}<br/>Amount Due (HKD): ${self.total_amount:.2f}", normal_style)
             ]
         ]
         
@@ -235,6 +250,9 @@ class Invoice:
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 20),
             ('TOPPADDING', (0, 0), (-1, -1), 10),
+            # Add logo styling (circular background)
+            ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#3498db')),
+            ('ROUNDEDCORNERS', (0, 0), (0, 0), 20),
         ]))
         story.append(header_table)
         story.append(Spacer(1, 15))
@@ -245,38 +263,46 @@ class Invoice:
         story.append(Paragraph(self.customer_address, normal_style))
         story.append(Spacer(1, 20))
         
-        # Line items table with professional styling
+        # Line items table with exact Wave format
         if self.lines:
-            # Table headers
+            # Table headers matching Wave format
             headers = ['Items', 'Quantity', 'Price', 'Amount']
             table_data = [headers]
             
-            # Add line items
+            # Add line items with detailed descriptions like Wave
             for line in self.lines:
+                # Create detailed description like Wave format
+                description = line.description
+                if line.tax_rate > 0:
+                    description += f" (Tax: {line.tax_rate:.1%})"
+                
                 table_data.append([
-                    line.description,
+                    description,
                     f"{line.quantity:.0f}" if line.quantity.is_integer() else f"{line.quantity:.2f}",
                     f"${line.unit_price:.2f}",
                     f"${line.total:.2f}"
                 ])
             
-            # Add summary section
+            # Add summary section matching Wave format
             table_data.append(['', '', '', ''])
             table_data.append(['', '', 'Total:', f"${self.total_amount:.2f}"])
             
-            # Add payment information if applicable
+            # Add payment information if applicable (like Wave format)
             if self.paid_amount > 0:
                 payment_date_str = self.paid_date.strftime('%B %d, %Y') if self.paid_date else 'N/A'
-                table_data.append(['', '', f'Payment on {payment_date_str}:', f"${self.paid_amount:.2f}"])
-                table_data.append(['', '', 'Amount Due:', f"${self.balance_due:.2f}"])
+                payment_method = "bank payment"  # Default payment method
+                table_data.append(['', '', f'Payment on {payment_date_str} using {payment_method}:', f"${self.paid_amount:.2f}"])
+                table_data.append(['', '', 'Amount Due (HKD):', f"${self.balance_due:.2f}"])
+            else:
+                table_data.append(['', '', 'Amount Due (HKD):', f"${self.total_amount:.2f}"])
             
-            # Create table with professional styling
+            # Create table with exact Wave styling
             col_widths = [doc.width * 0.5, doc.width * 0.15, doc.width * 0.15, doc.width * 0.2]
             
             line_items_table = Table(table_data, colWidths=col_widths)
             line_items_table.setStyle(TableStyle([
-                # Header styling
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#34495e')),
+                # Header styling (dark grey like Wave)
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, 0), 11),
@@ -290,40 +316,42 @@ class Invoice:
                 ('ALIGN', (3, 0), (3, -1), 'RIGHT'),  # Amount right-aligned
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 
-                # Summary section styling
+                # Summary section styling (light grey background like Wave)
                 ('FONTNAME', (0, -4), (-1, -1), 'Helvetica-Bold'),
-                ('BACKGROUND', (0, -4), (-1, -1), colors.HexColor('#ecf0f1')),
+                ('BACKGROUND', (0, -4), (-1, -1), colors.HexColor('#f8f9fa')),
                 
-                # Grid styling
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#bdc3c7')),
-                ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#34495e')),
-                ('LINEBELOW', (0, -5), (-1, -5), 1, colors.HexColor('#34495e')),
+                # Grid styling (subtle borders like Wave)
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dee2e6')),
+                ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#2c3e50')),
+                ('LINEBELOW', (0, -5), (-1, -5), 1, colors.HexColor('#2c3e50')),
             ]))
             story.append(line_items_table)
         
         story.append(Spacer(1, 20))
         
-        # Notes section
+        # Notes / Terms section with banking information (like Wave format)
+        story.append(Paragraph("Notes / Terms", section_heading_style))
+        
+        # Combine notes with banking information
+        notes_content = ""
         if self.notes:
-            story.append(Paragraph("Notes / Terms", section_heading_style))
-            story.append(Paragraph(self.notes, normal_style))
-            story.append(Spacer(1, 15))
+            notes_content += f"{self.notes}<br/><br/>"
         
-        # Payment instructions (if applicable)
-        if self.paid_amount == 0:
-            story.append(Paragraph("Payment Instructions", section_heading_style))
-            payment_instructions = f"""
-            Please make payment to:<br/>
-            <b>{company_info['name']}</b><br/>
-            Bank: Your Bank Name<br/>
-            Account: 123-456-789<br/>
-            Reference: {self.invoice_number}
-            """
-            story.append(Paragraph(payment_instructions, normal_style))
+        # Add banking information like Wave format
+        banking_info = f"""
+        <b>Bank Info:</b> HSBC<br/>
+        <b>Account Holder Name:</b> {company_info['name']}<br/>
+        <b>Account Code:</b> 004-456-653872-001 (Bank Code: 004, Branch Code: 456)<br/>
+        <b>SWIFT:</b> HSBCHKHHHKH
+        """
+        notes_content += banking_info
         
-        # Professional footer
-        footer_text = f"Thank you for your business! | Generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
+        story.append(Paragraph(notes_content, normal_style))
+        story.append(Spacer(1, 15))
+        
+        # Professional footer (like Wave format)
         story.append(Spacer(1, 30))
+        footer_text = f"Powered by PyLedger | Generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
         story.append(Paragraph(footer_text, small_style))
         
         # Build PDF
