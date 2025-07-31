@@ -71,6 +71,9 @@ python3 -m pyledger.main db-get-invoice
 # Record invoice payment
 python3 -m pyledger.main db-record-invoice-payment
 
+# Generate PDF invoice
+python3 -m pyledger.main db-generate-invoice-pdf
+
 # Add purchase order
 python3 -m pyledger.main db-add-po
 
@@ -112,6 +115,7 @@ uvicorn pyledger.api:app --reload --host 0.0.0.0 --port 8000
 - `GET /invoices/{invoice_number}` - Get invoice details
 - `GET /invoices/{invoice_number}/lines` - Get invoice line items
 - `POST /invoices/{invoice_number}/payment` - Record invoice payment
+- `GET /invoices/{invoice_number}/pdf` - Generate PDF invoice
 
 **Purchase Orders**
 - `GET /purchase_orders` - List all purchase orders
@@ -208,6 +212,7 @@ python3 -m pyledger.mcp_server
 - `list_invoices` - List all invoices
 - `get_invoice` - Get invoice details
 - `record_invoice_payment` - Record invoice payment
+- `generate_invoice_pdf` - Generate PDF invoice in A4 format
 
 **Purchase Orders**
 - `add_purchase_order` - Create new purchase order

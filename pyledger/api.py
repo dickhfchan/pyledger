@@ -10,7 +10,7 @@ from pyledger.db import (
 )
 from pyledger.reports import balance_sheet, income_statement, cash_flow_report
 from pyledger.accounts import ChartOfAccounts
-from pyledger.invoices import InvoiceStatus
+from pyledger.invoices import InvoiceStatus, Invoice, InvoiceLine
 from pyledger.purchase_orders import PurchaseOrderStatus
 
 app = FastAPI(title="PyLedger Accounting API")
@@ -279,6 +279,49 @@ def api_record_invoice_payment(invoice_number: str, payment: InvoicePaymentIn):
                           payment.paid_date.isoformat() if payment.paid_date else date.today().isoformat())
     conn.close()
     return {"message": "Payment recorded successfully"}
+
+@app.get("/invoices/{invoice_number}/pdf")
+def api_generate_invoice_pdf(invoice_number: str, company_info: Optional[dict] = None):
+    """Generate a PDF invoice."""
+    conn = get_connection()
+    try:
+        # Get invoice data
+        invoice_data = get_invoice(conn, invoice_number)
+        lines_data = get_invoice_lines(conn, invoice_number)
+        
+        # Create Invoice object
+        lines = [InvoiceLine(
+            description=line['description'],
+            quantity=line['quantity'],
+            unit_price=line['unit_price'],
+            tax_rate=line['tax_rate']
+        ) for line in lines_data]
+        
+        invoice = Invoice(
+            invoice_number=invoice_data['invoice_number'],
+            customer_name=invoice_data['customer_name'],
+            customer_address=invoice_data['customer_address'],
+            issue_date=date.fromisoformat(invoice_data['issue_date']),
+            due_date=date.fromisoformat(invoice_data['due_date']),
+            lines=lines,
+            status=InvoiceStatus(invoice_data['status']),
+            notes=invoice_data['notes']
+        )
+        invoice.paid_amount = invoice_data['paid_amount']
+        if invoice_data['paid_date']:
+            invoice.paid_date = date.fromisoformat(invoice_data['paid_date'])
+        
+        # Generate PDF
+        pdf_path = invoice.generate_pdf(company_info=company_info)
+        
+        # Return file path for download
+        return {
+            "message": f"PDF generated successfully",
+            "pdf_path": pdf_path,
+            "invoice_number": invoice_number
+        }
+    finally:
+        conn.close()
 
 # --- Purchase Order Endpoints ---
 @app.post("/purchase_orders", response_model=PurchaseOrderOut)

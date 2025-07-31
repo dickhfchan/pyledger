@@ -226,6 +226,70 @@ def db_record_invoice_payment_cmd():
     print('Payment recorded.')
     conn.close()
 
+def db_generate_invoice_pdf_cmd():
+    """Generate a PDF invoice."""
+    from datetime import date
+    from pyledger.invoices import Invoice, InvoiceLine, InvoiceStatus
+    
+    invoice_number = input('Invoice number: ')
+    
+    # Get company info
+    print("Enter company information (or press Enter for defaults):")
+    company_name = input('Company name: ') or 'Your Company Name'
+    company_address = input('Company address: ') or '123 Business Street\nCity, State 12345'
+    company_phone = input('Company phone: ') or '+1 (555) 123-4567'
+    company_email = input('Company email: ') or 'info@yourcompany.com'
+    company_website = input('Company website: ') or 'www.yourcompany.com'
+    
+    company_info = {
+        'name': company_name,
+        'address': company_address,
+        'phone': company_phone,
+        'email': company_email,
+        'website': company_website
+    }
+    
+    conn = get_connection()
+    try:
+        # Get invoice data
+        invoice_data = get_invoice(conn, invoice_number)
+        if not invoice_data:
+            print(f"❌ Invoice {invoice_number} not found")
+            return
+            
+        lines_data = get_invoice_lines(conn, invoice_number)
+        
+        # Create Invoice object
+        lines = [InvoiceLine(
+            description=line[1],  # description is at index 1
+            quantity=line[2],     # quantity is at index 2
+            unit_price=line[3],   # unit_price is at index 3
+            tax_rate=line[4]      # tax_rate is at index 4
+        ) for line in lines_data]
+        
+        invoice = Invoice(
+            invoice_number=invoice_data[0],      # invoice_number is at index 0
+            customer_name=invoice_data[1],       # customer_name is at index 1
+            customer_address=invoice_data[2],    # customer_address is at index 2
+            issue_date=date.fromisoformat(invoice_data[3]),  # issue_date is at index 3
+            due_date=date.fromisoformat(invoice_data[4]),    # due_date is at index 4
+            lines=lines,
+            status=InvoiceStatus(invoice_data[5]),  # status is at index 5
+            notes=invoice_data[6]                   # notes is at index 6
+        )
+        invoice.paid_amount = invoice_data[10]    # paid_amount is at index 10
+        if invoice_data[11]:                      # paid_date is at index 11
+            invoice.paid_date = date.fromisoformat(invoice_data[11])
+        
+        # Generate PDF
+        pdf_path = invoice.generate_pdf(company_info=company_info)
+        print(f"✅ PDF generated successfully: {pdf_path}")
+        
+    except Exception as e:
+        print(f"❌ Error generating PDF: {e}")
+    finally:
+        conn.close()
+
 # --- Purchase Order CLI Functions ---
 def db_add_purchase_order_interactive():
     conn = get_connection()
@@ -321,6 +385,7 @@ def main():
     subparsers.add_parser('db-list-invoices', help='List all invoices in the database')
     subparsers.add_parser('db-get-invoice', help='Get details for a specific invoice')
     subparsers.add_parser('db-record-invoice-payment', help='Record a payment for an invoice')
+    subparsers.add_parser('db-generate-invoice-pdf', help='Generate a PDF invoice')
     # Purchase order commands
     subparsers.add_parser('db-add-po', help='Add a new purchase order to the database')
     subparsers.add_parser('db-list-pos', help='List all purchase orders in the database')
@@ -379,6 +444,8 @@ def main():
         db_get_invoice_cmd()
     elif args.command == 'db-record-invoice-payment':
         db_record_invoice_payment_cmd()
+    elif args.command == 'db-generate-invoice-pdf':
+        db_generate_invoice_pdf_cmd()
     # Purchase order commands
     elif args.command == 'db-add-po':
         db_add_purchase_order_interactive()

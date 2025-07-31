@@ -2,6 +2,13 @@ from enum import Enum
 from typing import List, Dict, Optional
 from datetime import datetime, date
 from decimal import Decimal
+import os
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch, cm
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 
 class InvoiceStatus(Enum):
     DRAFT = "Draft"
@@ -130,6 +137,183 @@ class Invoice:
             'balance_due': self.balance_due,
             'paid_date': self.paid_date.isoformat() if self.paid_date else None
         }
+
+    def generate_pdf(self, output_path: str = None, company_info: Dict[str, str] = None) -> str:
+        """
+        Generate a PDF invoice in A4 format.
+        
+        Args:
+            output_path: Path to save the PDF file. If None, uses invoice number.
+            company_info: Dictionary with company details (name, address, phone, email, website)
+        
+        Returns:
+            Path to the generated PDF file
+        """
+        if output_path is None:
+            output_path = f"invoice_{self.invoice_number}.pdf"
+        
+        # Default company info if not provided
+        if company_info is None:
+            company_info = {
+                'name': 'Your Company Name',
+                'address': '123 Business Street\nCity, State 12345',
+                'phone': '+1 (555) 123-4567',
+                'email': 'info@yourcompany.com',
+                'website': 'www.yourcompany.com'
+            }
+        
+        # Create the PDF document
+        doc = SimpleDocTemplate(output_path, pagesize=A4)
+        story = []
+        
+        # Get styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=20,
+            alignment=TA_CENTER
+        )
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            spaceAfter=10
+        )
+        normal_style = styles['Normal']
+        small_style = ParagraphStyle(
+            'Small',
+            parent=styles['Normal'],
+            fontSize=10
+        )
+        
+        # Header section
+        header_data = [
+            [Paragraph(company_info['name'], title_style)],
+            [Paragraph(company_info['address'], normal_style)],
+            [Paragraph(f"Phone: {company_info['phone']}", small_style)],
+            [Paragraph(f"Email: {company_info['email']}", small_style)],
+            [Paragraph(f"Website: {company_info['website']}", small_style)]
+        ]
+        
+        header_table = Table(header_data, colWidths=[doc.width])
+        header_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ]))
+        story.append(header_table)
+        story.append(Spacer(1, 20))
+        
+        # Invoice title
+        story.append(Paragraph("INVOICE", title_style))
+        story.append(Spacer(1, 20))
+        
+        # Invoice details section
+        invoice_details = [
+            [Paragraph("Invoice Number:", heading_style), Paragraph(self.invoice_number, normal_style)],
+            [Paragraph("Issue Date:", heading_style), Paragraph(self.issue_date.strftime("%B %d, %Y"), normal_style)],
+            [Paragraph("Due Date:", heading_style), Paragraph(self.due_date.strftime("%B %d, %Y"), normal_style)],
+            [Paragraph("Status:", heading_style), Paragraph(self.status.value, normal_style)]
+        ]
+        
+        invoice_table = Table(invoice_details, colWidths=[doc.width * 0.3, doc.width * 0.7])
+        invoice_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(invoice_table)
+        story.append(Spacer(1, 20))
+        
+        # Customer information
+        story.append(Paragraph("Bill To:", heading_style))
+        story.append(Paragraph(self.customer_name, normal_style))
+        story.append(Paragraph(self.customer_address, normal_style))
+        story.append(Spacer(1, 20))
+        
+        # Line items table
+        if self.lines:
+            # Table headers
+            headers = ['Description', 'Quantity', 'Unit Price', 'Tax Rate', 'Subtotal', 'Tax', 'Total']
+            table_data = [headers]
+            
+            # Add line items
+            for line in self.lines:
+                table_data.append([
+                    line.description,
+                    f"{line.quantity:.2f}",
+                    f"${line.unit_price:.2f}",
+                    f"{line.tax_rate:.1%}",
+                    f"${line.subtotal:.2f}",
+                    f"${line.tax_amount:.2f}",
+                    f"${line.total:.2f}"
+                ])
+            
+            # Add totals row
+            table_data.append(['', '', '', '', '', '', ''])
+            table_data.append(['', '', '', '', 'Subtotal:', '', f"${self.subtotal:.2f}"])
+            table_data.append(['', '', '', '', 'Tax Total:', '', f"${self.total_tax:.2f}"])
+            table_data.append(['', '', '', '', 'Total:', '', f"${self.total_amount:.2f}"])
+            
+            # Create table
+            col_widths = [doc.width * 0.25, doc.width * 0.1, doc.width * 0.12, 
+                         doc.width * 0.1, doc.width * 0.12, doc.width * 0.1, doc.width * 0.12]
+            
+            line_items_table = Table(table_data, colWidths=col_widths)
+            line_items_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (0, 1), (0, -4), 'LEFT'),  # Description column left-aligned
+                ('ALIGN', (-3, -3), (-1, -1), 'RIGHT'),  # Totals right-aligned
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, -3), (-1, -1), colors.lightgrey),
+                ('FONTNAME', (0, -3), (-1, -1), 'Helvetica-Bold'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            story.append(line_items_table)
+        
+        story.append(Spacer(1, 20))
+        
+        # Payment information
+        if self.paid_amount > 0:
+            story.append(Paragraph("Payment Information:", heading_style))
+            payment_info = [
+                [Paragraph("Amount Paid:", normal_style), Paragraph(f"${self.paid_amount:.2f}", normal_style)],
+                [Paragraph("Balance Due:", normal_style), Paragraph(f"${self.balance_due:.2f}", normal_style)]
+            ]
+            if self.paid_date:
+                payment_info.append([Paragraph("Payment Date:", normal_style), 
+                                   Paragraph(self.paid_date.strftime("%B %d, %Y"), normal_style)])
+            
+            payment_table = Table(payment_info, colWidths=[doc.width * 0.3, doc.width * 0.7])
+            payment_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ]))
+            story.append(payment_table)
+            story.append(Spacer(1, 20))
+        
+        # Notes section
+        if self.notes:
+            story.append(Paragraph("Notes:", heading_style))
+            story.append(Paragraph(self.notes, normal_style))
+            story.append(Spacer(1, 20))
+        
+        # Footer
+        footer_text = f"Thank you for your business! | Generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
+        story.append(Paragraph(footer_text, small_style))
+        
+        # Build PDF
+        doc.build(story)
+        return output_path
 
     @staticmethod
     def from_dict(data):
