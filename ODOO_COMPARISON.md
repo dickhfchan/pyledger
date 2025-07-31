@@ -7,9 +7,9 @@ This document provides a detailed comparison between PyLedger and Odoo Accountin
 | **Feature** | **PyLedger** | **Odoo** | **Comparison** |
 |-------------|--------------|----------|----------------|
 | **Double-Entry Bookkeeping** | ✅ Full implementation | ✅ Full implementation | **Equal** - Both implement proper double-entry accounting |
-| **Chart of Accounts** | ✅ Basic structure | ✅ Comprehensive with localization | **Odoo Advantage** - More detailed with country-specific charts |
+| **Chart of Accounts** | ✅ Enhanced with opening balances | ✅ Comprehensive with localization | **Odoo Advantage** - More detailed with country-specific charts |
 | **Multi-Currency** | ❌ Not implemented | ✅ Full multi-currency support | **Odoo Advantage** - Advanced currency management |
-| **Multi-Company** | ❌ Not implemented | ✅ Full multi-company support | **Odoo Advantage** - Enterprise-level multi-company |
+| **Multi-Entity** | ✅ Full multi-entity support | ✅ Full multi-company support | **Equal** - Both support multiple entities/companies |
 | **Accrual vs Cash Basis** | ❌ Not implemented | ✅ Both accrual and cash basis | **Odoo Advantage** - Flexible accounting methods |
 
 ## **📋 Business Document Management**
@@ -38,7 +38,7 @@ This document provides a detailed comparison between PyLedger and Odoo Accountin
 | **Balance Sheet** | ✅ Basic implementation | ✅ Comprehensive with drill-down | **Odoo Advantage** - More detailed reporting |
 | **Income Statement** | ✅ Basic implementation | ✅ Advanced P&L reporting | **Odoo Advantage** - Sophisticated analysis |
 | **Cash Flow** | ✅ Basic implementation | ✅ Full cash flow analysis | **Odoo Advantage** - Advanced cash management |
-| **Tax Reports** | ❌ Not implemented | ✅ VAT, tax returns, declarations | **Odoo Advantage** - Complete tax compliance |
+| **Tax Handling** | ✅ Basic tax calculations | ✅ VAT, tax returns, declarations | **Odoo Advantage** - Complete tax compliance |
 | **Custom Reports** | ❌ Not implemented | ✅ Full report builder | **Odoo Advantage** - Flexible reporting engine |
 
 ## **🏢 Enterprise Features**
@@ -48,6 +48,7 @@ This document provides a detailed comparison between PyLedger and Odoo Accountin
 | **Asset Management** | ❌ Not implemented | ✅ Fixed asset depreciation | **Odoo Advantage** - Complete asset lifecycle |
 | **Budget Management** | ❌ Not implemented | ✅ Budget planning and tracking | **Odoo Advantage** - Financial planning tools |
 | **Analytic Accounting** | ❌ Not implemented | ✅ Cost center tracking | **Odoo Advantage** - Advanced cost analysis |
+| **Transaction Types** | ✅ Cash sales, purchases, opening balances | ✅ Comprehensive transaction types | **Equal** - Both support multiple transaction types |
 | **Audit Trail** | ✅ Basic logging | ✅ Comprehensive audit system | **Odoo Advantage** - Full compliance tracking |
 
 ## **🔧 Technical Architecture**
@@ -93,6 +94,7 @@ This document provides a detailed comparison between PyLedger and Odoo Accountin
 
 #### **🎯 Modern Architecture**
 - **Headless Design**: API-first approach with CLI and MCP interfaces
+- **Multi-Entity Support**: Full support for multiple companies/organizations
 - **Lightweight**: Simple SQLite database, easy deployment
 - **Developer-Friendly**: Full programmatic access and automation
 - **AI Integration**: Built-in MCP server for AI assistant interaction
@@ -101,10 +103,15 @@ This document provides a detailed comparison between PyLedger and Odoo Accountin
 - **Python Ecosystem**: Leverages modern Python 3.12+ features
 - **FastAPI**: High-performance REST API with automatic documentation
 - **Professional PDF Generation**: Advanced invoice PDF creation with Wave-inspired design
+- **Enhanced Database Schema**: Comprehensive tables for entities, accounts, transactions, invoices, and purchase orders
 - **Open Source**: MIT license with full code access
 
 #### **📋 Core Accounting**
 - **Double-Entry Validation**: Strict accounting equation compliance
+- **Enhanced Account Management**: Opening balances with dates and comprehensive structure
+- **Comprehensive Transaction Types**: Cash sales, purchases, opening balances, and journal entries
+- **Advanced Journal Entries**: Narration, quantity tracking, unit prices, and tax rates
+- **Tax Handling**: Automatic tax calculations with dedicated tax accounts
 - **Comprehensive Testing**: Professional test suite validating accounting principles
 - **Multiple Interfaces**: CLI, REST API, and MCP server
 - **Real-time Reporting**: Instant balance sheet, income statement, and cash flow
@@ -147,15 +154,18 @@ This document provides a detailed comparison between PyLedger and Odoo Accountin
 
 #### **🏢 Small to Medium Businesses**
 - **Budget-Conscious**: Looking for cost-effective accounting solution
-- **Simple Requirements**: Basic double-entry accounting without complex features
+- **Enhanced Requirements**: Need multi-entity support and advanced transaction types
 - **Technical Staff**: Have developers who can work with APIs and CLI
 - **Rapid Deployment**: Need quick setup and deployment
+- **Tax Compliance**: Require basic tax handling and calculations
 
 #### **🔧 Specific Use Cases**
 - **Microservices Architecture**: Need accounting as a service component
+- **Multi-Entity Operations**: Managing multiple companies or organizations
 - **Headless Applications**: Building applications without web interfaces
 - **Automation Projects**: Integrating accounting with other business processes
 - **AI-Powered Accounting**: Using AI assistants for financial management
+- **Enhanced Transaction Types**: Need cash sales, purchases, and opening balances
 
 ### **Choose Odoo for:**
 
@@ -190,8 +200,10 @@ This document provides a detailed comparison between PyLedger and Odoo Accountin
 2. **Enhanced Reporting**: Improve financial reporting with drill-down
 3. **User Management**: Add role-based access control
 4. **Bank Reconciliation**: Implement basic bank reconciliation
-5. **Tax Management**: Add comprehensive tax handling
+5. **Advanced Tax Management**: Expand tax handling capabilities
 6. **Web Interface**: Develop basic web dashboard
+7. **Asset Management**: Add fixed asset tracking and depreciation
+8. **Budget Management**: Implement budget planning and tracking
 
 ### **Odoo Development Focus**
 1. **AI Integration**: Adding AI-powered features
@@ -223,11 +235,12 @@ This document provides a detailed comparison between PyLedger and Odoo Accountin
 
 PyLedger excels as a **modern, developer-friendly accounting system** that prioritizes:
 
-- **🎯 Simplicity**: Clean, focused accounting without complexity
+- **🎯 Enhanced Functionality**: Multi-entity support with advanced transaction types
 - **🔧 Automation**: Programmatic access for custom workflows
 - **🤖 AI Integration**: Built-in support for AI assistants
 - **💻 Developer Experience**: Modern Python with comprehensive APIs
 - **📦 Lightweight**: Easy deployment and minimal resource usage
+- **📊 Advanced Features**: Opening balances, tax handling, and comprehensive journal entries
 
 ### **Odoo: The Enterprise Powerhouse**
 
@@ -244,7 +257,9 @@ Odoo dominates as a **comprehensive enterprise accounting solution** offering:
 **Choose PyLedger if you need:**
 - ✅ Programmatic access to accounting data
 - ✅ AI assistant integration
-- ✅ Simple, focused accounting
+- ✅ Multi-entity support
+- ✅ Enhanced transaction types (cash sales, purchases, opening balances)
+- ✅ Advanced journal entries with narration and tax rates
 - ✅ Cost-effective solution
 - ✅ Custom development capabilities
 
