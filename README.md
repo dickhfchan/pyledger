@@ -4,9 +4,12 @@ A comprehensive, headless Python accounting application that implements double-e
 
 ## Features
 
+- **Multi-Entity Support**: Manage multiple companies/organizations with isolated data
 - **Double-Entry Accounting**: Full implementation of double-entry bookkeeping principles
-- **Chart of Accounts**: Comprehensive account management with standard accounting categories
-- **Journal Entries**: Transaction recording with automatic balance validation
+- **Enhanced Account Management**: Opening balances, opening dates, and comprehensive account structure
+- **Comprehensive Transaction Types**: Cash sales, cash purchases, opening balances, and standard journal entries
+- **Advanced Journal Entries**: Narration, quantity tracking, unit prices, and tax rate support
+- **Tax Handling**: Automatic tax calculations with dedicated tax payable/receivable accounts
 - **Invoice Management**: Complete invoice system with customer management, line items, and payment tracking
 - **Purchase Order Management**: Full purchase order system with supplier management, receipt tracking, and status management
 - **Financial Reports**: Balance Sheet, Income Statement, and Cash Flow reporting
@@ -44,20 +47,35 @@ pip install -e .
 # Initialize database
 python3 -m pyledger.main db-init
 
-# Add accounts
-python3 -m pyledger.main db-add-account
+# Add entities
+python3 -m pyledger.main db-add-entity
 
-# Add journal entries
-python3 -m pyledger.main db-add-entry
+# List entities
+python3 -m pyledger.main db-list-entities
+
+# Add accounts with opening balances
+python3 -m pyledger.main db-add-account
 
 # List accounts
 python3 -m pyledger.main db-list-accounts
+
+# Add journal entries
+python3 -m pyledger.main db-add-entry
 
 # List journal entries
 python3 -m pyledger.main db-list-entries
 
 # View entry details
 python3 -m pyledger.main db-entry-lines <entry_id>
+
+# Create cash sale transaction
+python3 -m pyledger.main db-cash-sale
+
+# Create cash purchase transaction
+python3 -m pyledger.main db-cash-purchase
+
+# Create opening balance transaction
+python3 -m pyledger.main db-opening-balance
 
 # Add invoice
 python3 -m pyledger.main db-add-invoice
@@ -99,15 +117,27 @@ uvicorn pyledger.api:app --reload --host 0.0.0.0 --port 8000
 
 #### API Endpoints
 
+**Entities**
+- `GET /entities` - List all entities
+- `POST /entities` - Create new entity
+- `GET /entities/{id}` - Get entity details
+
 **Accounts**
 - `GET /accounts` - List all accounts
-- `POST /accounts` - Create new account
+- `POST /accounts` - Create new account with opening balance
 - `GET /accounts/{code}` - Get account details
+- `GET /accounts/{code}/balance` - Get account balance history
 
 **Journal Entries**
 - `GET /journal_entries` - List all journal entries
 - `POST /journal_entries` - Create new journal entry
 - `GET /journal_entries/{id}` - Get journal entry details
+- `GET /journal_entries/{id}/lines` - Get journal entry lines
+
+**Transaction Types**
+- `POST /transactions/cash-sale` - Create cash sale transaction
+- `POST /transactions/cash-purchase` - Create cash purchase transaction
+- `POST /transactions/opening-balance` - Create opening balance transaction
 
 **Invoices**
 - `GET /invoices` - List all invoices
@@ -132,19 +162,63 @@ uvicorn pyledger.api:app --reload --host 0.0.0.0 --port 8000
 #### Example API Usage
 
 ```bash
-# Create an account
+# Create an entity
+curl -X POST "http://localhost:8000/entities" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Acme Corporation", "code": "ACME", "description": "Test company"}'
+
+# Create an account with opening balance
 curl -X POST "http://localhost:8000/accounts" \
   -H "Content-Type: application/json" \
-  -d '{"code": "1000", "name": "Cash", "type": "ASSET", "balance": 0.0}'
+  -d '{
+    "code": "1000", 
+    "name": "Cash", 
+    "type": "ASSET", 
+    "balance": 0.0,
+    "opening_balance": 10000.0,
+    "opening_date": "2024-01-01"
+  }'
 
-# Create a journal entry
+# Create a cash sale transaction
+curl -X POST "http://localhost:8000/transactions/cash-sale" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Sale of consulting services",
+    "entry_date": "2024-01-15",
+    "cash_account": "1000",
+    "revenue_account": "4000",
+    "amount": 5000.0,
+    "tax_rate": 0.1,
+    "reference": "INV-001"
+  }'
+
+# Create a journal entry with enhanced features
 curl -X POST "http://localhost:8000/journal_entries" \
   -H "Content-Type: application/json" \
   -d '{
-    "description": "Initial investment",
+    "description": "Owner investment",
+    "entry_date": "2024-01-01",
+    "transaction_type": "journal_entry",
+    "reference": "INV-001",
     "lines": [
-      {"account_code": "1000", "amount": 10000.0, "is_debit": true},
-      {"account_code": "3000", "amount": 10000.0, "is_debit": false}
+      {
+        "account_code": "1000", 
+        "amount": 1000.0, 
+        "is_debit": true,
+        "narration": "Owner investment",
+        "quantity": 1.0,
+        "unit_price": 1000.0,
+        "tax_rate": 0.0
+      },
+      {
+        "account_code": "3000", 
+        "amount": 1000.0, 
+        "is_debit": false,
+        "narration": "Owner equity",
+        "quantity": 1.0,
+        "unit_price": 1000.0,
+        "tax_rate": 0.0
+      }
     ]
   }'
 
@@ -200,12 +274,20 @@ python3 -m pyledger.mcp_server
 
 #### Available MCP Tools
 
-**Accounts & Journal Entries**
+**Entities & Accounts**
+- `list_entities` - List all entities
+- `add_entity` - Create new entity
 - `list_accounts` - List all accounts
-- `add_account` - Create new account
-- `add_journal_entry` - Create journal entry
+- `add_account` - Create new account with opening balance
+- `get_account_balance` - Get account balance history
+
+**Journal Entries & Transactions**
+- `add_journal_entry` - Create journal entry with enhanced features
 - `list_journal_entries` - List all journal entries
 - `get_journal_lines` - Get journal entry details
+- `create_cash_sale` - Create cash sale transaction
+- `create_cash_purchase` - Create cash purchase transaction
+- `create_opening_balance` - Create opening balance transaction
 
 **Invoices**
 - `add_invoice` - Create new invoice
@@ -231,6 +313,7 @@ python3 -m pyledger.mcp_server
 pyledger/
 ├── accounts.py          # Account and Chart of Accounts classes
 ├── journal.py           # Journal entries and ledger
+├── transaction_types.py # Transaction type management (cash sales, purchases, etc.)
 ├── invoices.py          # Invoice management system
 ├── purchase_orders.py   # Purchase order management system
 ├── reports.py           # Financial reporting functions
@@ -241,7 +324,8 @@ pyledger/
 ├── accounting_tests.py  # Professional accounting test suite
 ├── test_db.py          # Database function tests
 ├── test_mcp.py         # MCP server tests
-└── test_pyledger.py    # Core functionality tests
+├── test_pyledger.py    # Core functionality tests
+└── test_enhanced_features.py # Enhanced features test suite
 ```
 
 ## Accounting Principles
@@ -262,6 +346,9 @@ Run the comprehensive test suite:
 # Run all tests
 python3 -m pyledger.accounting_tests
 
+# Run enhanced features tests
+python3 test_enhanced_features.py
+
 # Run specific test modules
 python3 -m pyledger.test_db
 python3 -m pyledger.test_mcp
@@ -269,12 +356,17 @@ python3 -m pyledger.test_pyledger
 ```
 
 The test suite validates:
-- Accounting equation compliance
-- Double-entry validation
-- Revenue/expense tracking
-- Balance sheet accuracy
-- Income statement accuracy
-- Real-world business scenarios
+- **Multi-entity support** with data isolation
+- **Enhanced account management** with opening balances
+- **Comprehensive transaction types** (cash sales, purchases, opening balances)
+- **Advanced journal entries** with narration, quantities, and tax rates
+- **Tax handling** with automatic calculations
+- **Accounting equation compliance**
+- **Double-entry validation**
+- **Revenue/expense tracking**
+- **Balance sheet accuracy**
+- **Income statement accuracy**
+- **Real-world business scenarios**
 
 ## Development
 
@@ -289,9 +381,14 @@ The test suite validates:
 ### Database Schema
 
 The SQLite database includes:
-- `accounts` table: Account information and balances
-- `journal_entries` table: Journal entry metadata
-- `journal_lines` table: Individual debit/credit lines
+- `entities` table: Multi-entity support with company/organization data
+- `accounts` table: Account information with opening balances and dates
+- `journal_entries` table: Journal entry metadata with transaction types
+- `journal_lines` table: Individual debit/credit lines with narration, quantities, and tax rates
+- `invoices` table: Invoice management with customer data
+- `invoice_lines` table: Invoice line items with quantities and prices
+- `purchase_orders` table: Purchase order management with supplier data
+- `purchase_order_lines` table: Purchase order line items with quantities and prices
 
 ## License
 
