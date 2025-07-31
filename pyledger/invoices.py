@@ -140,7 +140,7 @@ class Invoice:
 
     def generate_pdf(self, output_path: str = None, company_info: Dict[str, str] = None) -> str:
         """
-        Generate a PDF invoice in A4 format.
+        Generate a PDF invoice in A4 format with professional layout.
         
         Args:
             output_path: Path to save the PDF file. If None, uses invoice number.
@@ -168,147 +168,162 @@ class Invoice:
         
         # Get styles
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
+        
+        # Professional styles
+        company_name_style = ParagraphStyle(
+            'CompanyName',
             parent=styles['Heading1'],
-            fontSize=18,
+            fontSize=20,
+            fontName='Helvetica-Bold',
+            textColor=colors.HexColor('#2c3e50'),
+            spaceAfter=5,
+            alignment=TA_RIGHT
+        )
+        
+        invoice_title_style = ParagraphStyle(
+            'InvoiceTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            fontName='Helvetica-Bold',
+            textColor=colors.HexColor('#2c3e50'),
             spaceAfter=20,
-            alignment=TA_CENTER
+            alignment=TA_RIGHT
         )
-        heading_style = ParagraphStyle(
-            'CustomHeading',
+        
+        section_heading_style = ParagraphStyle(
+            'SectionHeading',
             parent=styles['Heading2'],
-            fontSize=14,
-            spaceAfter=10
+            fontSize=12,
+            fontName='Helvetica-Bold',
+            textColor=colors.HexColor('#34495e'),
+            spaceAfter=8,
+            spaceBefore=15
         )
-        normal_style = styles['Normal']
+        
+        normal_style = ParagraphStyle(
+            'Normal',
+            parent=styles['Normal'],
+            fontSize=10,
+            fontName='Helvetica',
+            textColor=colors.HexColor('#2c3e50'),
+            spaceAfter=3
+        )
+        
         small_style = ParagraphStyle(
             'Small',
             parent=styles['Normal'],
-            fontSize=10
+            fontSize=9,
+            fontName='Helvetica',
+            textColor=colors.HexColor('#7f8c8d'),
+            spaceAfter=2
         )
         
-        # Header section
+        # Header section with two-column layout
         header_data = [
-            [Paragraph(company_info['name'], title_style)],
-            [Paragraph(company_info['address'], normal_style)],
-            [Paragraph(f"Phone: {company_info['phone']}", small_style)],
-            [Paragraph(f"Email: {company_info['email']}", small_style)],
-            [Paragraph(f"Website: {company_info['website']}", small_style)]
+            [
+                # Left column - Logo placeholder and company info
+                Paragraph(f"<b>{company_info['name']}</b><br/>{company_info['address']}<br/>Phone: {company_info['phone']}<br/>Email: {company_info['email']}<br/>Website: {company_info['website']}", normal_style),
+                # Right column - Invoice title and details
+                Paragraph(f"<b>INVOICE</b><br/><br/>Invoice Number: {self.invoice_number}<br/>Issue Date: {self.issue_date.strftime('%B %d, %Y')}<br/>Due Date: {self.due_date.strftime('%B %d, %Y')}<br/>Status: {self.status.value}", normal_style)
+            ]
         ]
         
-        header_table = Table(header_data, colWidths=[doc.width])
+        header_table = Table(header_data, colWidths=[doc.width * 0.5, doc.width * 0.5])
         header_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 20),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
         ]))
         story.append(header_table)
-        story.append(Spacer(1, 20))
+        story.append(Spacer(1, 15))
         
-        # Invoice title
-        story.append(Paragraph("INVOICE", title_style))
-        story.append(Spacer(1, 20))
-        
-        # Invoice details section
-        invoice_details = [
-            [Paragraph("Invoice Number:", heading_style), Paragraph(self.invoice_number, normal_style)],
-            [Paragraph("Issue Date:", heading_style), Paragraph(self.issue_date.strftime("%B %d, %Y"), normal_style)],
-            [Paragraph("Due Date:", heading_style), Paragraph(self.due_date.strftime("%B %d, %Y"), normal_style)],
-            [Paragraph("Status:", heading_style), Paragraph(self.status.value, normal_style)]
-        ]
-        
-        invoice_table = Table(invoice_details, colWidths=[doc.width * 0.3, doc.width * 0.7])
-        invoice_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ]))
-        story.append(invoice_table)
-        story.append(Spacer(1, 20))
-        
-        # Customer information
-        story.append(Paragraph("Bill To:", heading_style))
-        story.append(Paragraph(self.customer_name, normal_style))
+        # Billing information section
+        story.append(Paragraph("BILL TO", section_heading_style))
+        story.append(Paragraph(f"<b>{self.customer_name}</b>", normal_style))
         story.append(Paragraph(self.customer_address, normal_style))
         story.append(Spacer(1, 20))
         
-        # Line items table
+        # Line items table with professional styling
         if self.lines:
             # Table headers
-            headers = ['Description', 'Quantity', 'Unit Price', 'Tax Rate', 'Subtotal', 'Tax', 'Total']
+            headers = ['Items', 'Quantity', 'Price', 'Amount']
             table_data = [headers]
             
             # Add line items
             for line in self.lines:
                 table_data.append([
                     line.description,
-                    f"{line.quantity:.2f}",
+                    f"{line.quantity:.0f}" if line.quantity.is_integer() else f"{line.quantity:.2f}",
                     f"${line.unit_price:.2f}",
-                    f"{line.tax_rate:.1%}",
-                    f"${line.subtotal:.2f}",
-                    f"${line.tax_amount:.2f}",
                     f"${line.total:.2f}"
                 ])
             
-            # Add totals row
-            table_data.append(['', '', '', '', '', '', ''])
-            table_data.append(['', '', '', '', 'Subtotal:', '', f"${self.subtotal:.2f}"])
-            table_data.append(['', '', '', '', 'Tax Total:', '', f"${self.total_tax:.2f}"])
-            table_data.append(['', '', '', '', 'Total:', '', f"${self.total_amount:.2f}"])
+            # Add summary section
+            table_data.append(['', '', '', ''])
+            table_data.append(['', '', 'Total:', f"${self.total_amount:.2f}"])
             
-            # Create table
-            col_widths = [doc.width * 0.25, doc.width * 0.1, doc.width * 0.12, 
-                         doc.width * 0.1, doc.width * 0.12, doc.width * 0.1, doc.width * 0.12]
+            # Add payment information if applicable
+            if self.paid_amount > 0:
+                payment_date_str = self.paid_date.strftime('%B %d, %Y') if self.paid_date else 'N/A'
+                table_data.append(['', '', f'Payment on {payment_date_str}:', f"${self.paid_amount:.2f}"])
+                table_data.append(['', '', 'Amount Due:', f"${self.balance_due:.2f}"])
+            
+            # Create table with professional styling
+            col_widths = [doc.width * 0.5, doc.width * 0.15, doc.width * 0.15, doc.width * 0.2]
             
             line_items_table = Table(table_data, colWidths=col_widths)
             line_items_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('ALIGN', (0, 1), (0, -4), 'LEFT'),  # Description column left-aligned
-                ('ALIGN', (-3, -3), (-1, -1), 'RIGHT'),  # Totals right-aligned
+                # Header styling
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#34495e')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, -3), (-1, -1), colors.lightgrey),
-                ('FONTNAME', (0, -3), (-1, -1), 'Helvetica-Bold'),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('TOPPADDING', (0, 0), (-1, 0), 8),
+                
+                # Content styling
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),  # Items column left-aligned
+                ('ALIGN', (1, 0), (1, -1), 'CENTER'),  # Quantity center-aligned
+                ('ALIGN', (2, 0), (2, -1), 'RIGHT'),  # Price right-aligned
+                ('ALIGN', (3, 0), (3, -1), 'RIGHT'),  # Amount right-aligned
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                
+                # Summary section styling
+                ('FONTNAME', (0, -4), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -4), (-1, -1), colors.HexColor('#ecf0f1')),
+                
+                # Grid styling
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#bdc3c7')),
+                ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#34495e')),
+                ('LINEBELOW', (0, -5), (-1, -5), 1, colors.HexColor('#34495e')),
             ]))
             story.append(line_items_table)
         
         story.append(Spacer(1, 20))
         
-        # Payment information
-        if self.paid_amount > 0:
-            story.append(Paragraph("Payment Information:", heading_style))
-            payment_info = [
-                [Paragraph("Amount Paid:", normal_style), Paragraph(f"${self.paid_amount:.2f}", normal_style)],
-                [Paragraph("Balance Due:", normal_style), Paragraph(f"${self.balance_due:.2f}", normal_style)]
-            ]
-            if self.paid_date:
-                payment_info.append([Paragraph("Payment Date:", normal_style), 
-                                   Paragraph(self.paid_date.strftime("%B %d, %Y"), normal_style)])
-            
-            payment_table = Table(payment_info, colWidths=[doc.width * 0.3, doc.width * 0.7])
-            payment_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ]))
-            story.append(payment_table)
-            story.append(Spacer(1, 20))
-        
         # Notes section
         if self.notes:
-            story.append(Paragraph("Notes:", heading_style))
+            story.append(Paragraph("Notes / Terms", section_heading_style))
             story.append(Paragraph(self.notes, normal_style))
-            story.append(Spacer(1, 20))
+            story.append(Spacer(1, 15))
         
-        # Footer
+        # Payment instructions (if applicable)
+        if self.paid_amount == 0:
+            story.append(Paragraph("Payment Instructions", section_heading_style))
+            payment_instructions = f"""
+            Please make payment to:<br/>
+            <b>{company_info['name']}</b><br/>
+            Bank: Your Bank Name<br/>
+            Account: 123-456-789<br/>
+            Reference: {self.invoice_number}
+            """
+            story.append(Paragraph(payment_instructions, normal_style))
+        
+        # Professional footer
         footer_text = f"Thank you for your business! | Generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
+        story.append(Spacer(1, 30))
         story.append(Paragraph(footer_text, small_style))
         
         # Build PDF
