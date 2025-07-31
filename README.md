@@ -308,4 +308,8 @@ This project is licensed under the MIT License.
 
 ## Support
 
-For issues and questions, please open an issue on GitHub. 
+For issues and questions, please open an issue on GitHub.
+
+## Comparison with Other Systems
+
+For a detailed comparison between PyLedger and other accounting systems like Odoo, see [ODOO_COMPARISON.md](ODOO_COMPARISON.md). 
