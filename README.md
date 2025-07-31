@@ -312,4 +312,7 @@ For issues and questions, please open an issue on GitHub.
 
 ## Comparison with Other Systems
 
-For a detailed comparison between PyLedger and other accounting systems like Odoo, see [ODOO_COMPARISON.md](ODOO_COMPARISON.md). 
+For detailed comparisons between PyLedger and other accounting systems:
+
+- **PyLedger vs Odoo**: See [ODOO_COMPARISON.md](ODOO_COMPARISON.md)
+- **PyLedger vs Python-Accounting**: See [PYTHON_ACCOUNTING_COMPARISON.md](PYTHON_ACCOUNTING_COMPARISON.md) 
