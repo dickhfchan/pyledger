@@ -225,7 +225,7 @@ class Invoice:
             parent=styles['Normal'],
             fontSize=16,
             fontName='Helvetica-Bold',
-            textColor=colors.white,
+            textColor=colors.HexColor('#2c3e50'),
             alignment=TA_CENTER
         )
         
@@ -250,8 +250,8 @@ class Invoice:
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 20),
             ('TOPPADDING', (0, 0), (-1, -1), 10),
-            # Add logo styling (circular background)
-            ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#3498db')),
+            # Add logo styling (white background)
+            ('BACKGROUND', (0, 0), (0, 0), colors.white),
             ('ROUNDEDCORNERS', (0, 0), (0, 0), 20),
         ]))
         story.append(header_table)
