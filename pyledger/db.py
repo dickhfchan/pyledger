@@ -9,7 +9,8 @@ def get_connection(db_file: str = DB_FILE):
 
 def init_db(conn: sqlite3.Connection):
     """
-    Create tables for accounts, journal_entries, journal_lines, invoices, and purchase_orders.
+    Create tables for accounts, journal_entries, journal_lines, invoices, purchase_orders,
+    payment_clearings, and aging schedules.
     """
     c = conn.cursor()
     c.execute('''
@@ -104,6 +105,48 @@ def init_db(conn: sqlite3.Connection):
             FOREIGN KEY(po_number) REFERENCES purchase_orders(po_number)
         )
     ''')
+    
+    # Create payment_clearings table for advanced payment clearing
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS payment_clearings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            clearing_date DATE NOT NULL,
+            payment_type TEXT NOT NULL, -- 'receivable' or 'payable'
+            payment_reference TEXT NOT NULL,
+            invoice_number TEXT,
+            po_number TEXT,
+            customer_supplier_name TEXT NOT NULL,
+            original_amount REAL NOT NULL,
+            cleared_amount REAL NOT NULL,
+            remaining_amount REAL NOT NULL,
+            clearing_method TEXT NOT NULL, -- 'full', 'partial', 'multiple'
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(invoice_number) REFERENCES invoices(invoice_number),
+            FOREIGN KEY(po_number) REFERENCES purchase_orders(po_number)
+        )
+    ''')
+    
+    # Create aging_schedules table for receivable and payable aging
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS aging_schedules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            schedule_date DATE NOT NULL,
+            schedule_type TEXT NOT NULL, -- 'receivable' or 'payable'
+            customer_supplier_name TEXT NOT NULL,
+            invoice_number TEXT,
+            po_number TEXT,
+            original_amount REAL NOT NULL,
+            current_balance REAL NOT NULL,
+            days_overdue INTEGER NOT NULL,
+            aging_period TEXT NOT NULL, -- 'current', '30_days', '60_days', '90_days', 'over_90_days'
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(invoice_number) REFERENCES invoices(invoice_number),
+            FOREIGN KEY(po_number) REFERENCES purchase_orders(po_number)
+        )
+    ''')
+    
     conn.commit()
 
 def add_account(conn: sqlite3.Connection, code: str, name: str, type: AccountType, balance: float = 0.0):
@@ -378,3 +421,349 @@ def update_purchase_order_receipt(conn: sqlite3.Connection, po_number: str, line
     ''', (po_number, po_number, po_number, received_date, po_number))
     
     conn.commit()
+
+# Advanced Payment Clearing Functions
+
+def add_payment_clearing(conn: sqlite3.Connection, clearing_date: str, payment_type: str, 
+                        payment_reference: str, customer_supplier_name: str, original_amount: float,
+                        cleared_amount: float, remaining_amount: float, clearing_method: str,
+                        invoice_number: str = None, po_number: str = None, notes: str = None):
+    """
+    Add a payment clearing record for advanced payment tracking.
+    
+    Args:
+        clearing_date: Date of the payment clearing
+        payment_type: 'receivable' or 'payable'
+        payment_reference: Reference number for the payment
+        customer_supplier_name: Name of customer or supplier
+        original_amount: Original invoice/PO amount
+        cleared_amount: Amount cleared by this payment
+        remaining_amount: Remaining balance after clearing
+        clearing_method: 'full', 'partial', or 'multiple'
+        invoice_number: Associated invoice number (for receivables)
+        po_number: Associated purchase order number (for payables)
+        notes: Additional notes
+    """
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO payment_clearings (clearing_date, payment_type, payment_reference, invoice_number,
+                                     po_number, customer_supplier_name, original_amount, cleared_amount,
+                                     remaining_amount, clearing_method, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (clearing_date, payment_type, payment_reference, invoice_number, po_number,
+          customer_supplier_name, original_amount, cleared_amount, remaining_amount, clearing_method, notes))
+    conn.commit()
+    return c.lastrowid
+
+def get_payment_clearings(conn: sqlite3.Connection, payment_type: Optional[str] = None, 
+                         customer_supplier_name: Optional[str] = None) -> List[Tuple]:
+    """
+    Get payment clearing records with optional filtering.
+    """
+    c = conn.cursor()
+    
+    if payment_type and customer_supplier_name:
+        c.execute('''
+            SELECT id, clearing_date, payment_type, payment_reference, invoice_number, po_number,
+                   customer_supplier_name, original_amount, cleared_amount, remaining_amount,
+                   clearing_method, notes, created_at
+            FROM payment_clearings 
+            WHERE payment_type = ? AND customer_supplier_name = ?
+            ORDER BY clearing_date DESC
+        ''', (payment_type, customer_supplier_name))
+    elif payment_type:
+        c.execute('''
+            SELECT id, clearing_date, payment_type, payment_reference, invoice_number, po_number,
+                   customer_supplier_name, original_amount, cleared_amount, remaining_amount,
+                   clearing_method, notes, created_at
+            FROM payment_clearings 
+            WHERE payment_type = ?
+            ORDER BY clearing_date DESC
+        ''', (payment_type,))
+    elif customer_supplier_name:
+        c.execute('''
+            SELECT id, clearing_date, payment_type, payment_reference, invoice_number, po_number,
+                   customer_supplier_name, original_amount, cleared_amount, remaining_amount,
+                   clearing_method, notes, created_at
+            FROM payment_clearings 
+            WHERE customer_supplier_name = ?
+            ORDER BY clearing_date DESC
+        ''', (customer_supplier_name,))
+    else:
+        c.execute('''
+            SELECT id, clearing_date, payment_type, payment_reference, invoice_number, po_number,
+                   customer_supplier_name, original_amount, cleared_amount, remaining_amount,
+                   clearing_method, notes, created_at
+            FROM payment_clearings 
+            ORDER BY clearing_date DESC
+        ''')
+    
+    return c.fetchall()
+
+def clear_invoice_payment(conn: sqlite3.Connection, invoice_number: str, payment_amount: float,
+                         payment_date: str, payment_reference: str, clearing_method: str = 'partial'):
+    """
+    Clear an invoice payment with advanced tracking.
+    """
+    c = conn.cursor()
+    
+    # Get current invoice information
+    c.execute('''
+        SELECT customer_name, total_amount, paid_amount
+        FROM invoices WHERE invoice_number = ?
+    ''', (invoice_number,))
+    invoice = c.fetchone()
+    
+    if not invoice:
+        raise ValueError(f"Invoice {invoice_number} not found")
+    
+    customer_name, total_amount, current_paid = invoice
+    new_paid_amount = current_paid + payment_amount
+    remaining_amount = total_amount - new_paid_amount
+    
+    # Update invoice payment
+    c.execute('''
+        UPDATE invoices 
+        SET paid_amount = ?, paid_date = ?
+        WHERE invoice_number = ?
+    ''', (new_paid_amount, payment_date, invoice_number))
+    
+    # Add payment clearing record
+    add_payment_clearing(
+        conn=conn,
+        clearing_date=payment_date,
+        payment_type='receivable',
+        payment_reference=payment_reference,
+        customer_supplier_name=customer_name,
+        original_amount=total_amount,
+        cleared_amount=payment_amount,
+        remaining_amount=remaining_amount,
+        clearing_method=clearing_method,
+        invoice_number=invoice_number,
+        notes=f"Payment clearing for invoice {invoice_number}"
+    )
+    
+    conn.commit()
+
+def clear_purchase_order_payment(conn: sqlite3.Connection, po_number: str, payment_amount: float,
+                               payment_date: str, payment_reference: str, clearing_method: str = 'partial'):
+    """
+    Clear a purchase order payment with advanced tracking.
+    """
+    c = conn.cursor()
+    
+    # Get current PO information
+    c.execute('''
+        SELECT supplier_name, total_amount, received_total
+        FROM purchase_orders WHERE po_number = ?
+    ''', (po_number,))
+    po = c.fetchone()
+    
+    if not po:
+        raise ValueError(f"Purchase order {po_number} not found")
+    
+    supplier_name, total_amount, current_received = po
+    new_received_amount = current_received + payment_amount
+    remaining_amount = total_amount - new_received_amount
+    
+    # Update PO received amount
+    c.execute('''
+        UPDATE purchase_orders 
+        SET received_total = ?, received_date = ?
+        WHERE po_number = ?
+    ''', (new_received_amount, payment_date, po_number))
+    
+    # Add payment clearing record
+    add_payment_clearing(
+        conn=conn,
+        clearing_date=payment_date,
+        payment_type='payable',
+        payment_reference=payment_reference,
+        customer_supplier_name=supplier_name,
+        original_amount=total_amount,
+        cleared_amount=payment_amount,
+        remaining_amount=remaining_amount,
+        clearing_method=clearing_method,
+        po_number=po_number,
+        notes=f"Payment clearing for PO {po_number}"
+    )
+    
+    conn.commit()
+
+def add_aging_schedule(conn: sqlite3.Connection, schedule_date: str, schedule_type: str,
+                      customer_supplier_name: str, original_amount: float, current_balance: float,
+                      days_overdue: int, aging_period: str, invoice_number: str = None,
+                      po_number: str = None, notes: str = None):
+    """
+    Add an aging schedule record for receivables or payables.
+    
+    Args:
+        schedule_date: Date of the aging schedule
+        schedule_type: 'receivable' or 'payable'
+        customer_supplier_name: Name of customer or supplier
+        original_amount: Original invoice/PO amount
+        current_balance: Current outstanding balance
+        days_overdue: Number of days overdue
+        aging_period: 'current', '30_days', '60_days', '90_days', 'over_90_days'
+        invoice_number: Associated invoice number (for receivables)
+        po_number: Associated purchase order number (for payables)
+        notes: Additional notes
+    """
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO aging_schedules (schedule_date, schedule_type, customer_supplier_name,
+                                   invoice_number, po_number, original_amount, current_balance,
+                                   days_overdue, aging_period, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (schedule_date, schedule_type, customer_supplier_name, invoice_number, po_number,
+          original_amount, current_balance, days_overdue, aging_period, notes))
+    conn.commit()
+    return c.lastrowid
+
+def get_aging_schedule(conn: sqlite3.Connection, schedule_type: Optional[str] = None,
+                      customer_supplier_name: Optional[str] = None, aging_period: Optional[str] = None) -> List[Tuple]:
+    """
+    Get aging schedule records with optional filtering.
+    """
+    c = conn.cursor()
+    
+    conditions = []
+    params = []
+    
+    if schedule_type:
+        conditions.append("schedule_type = ?")
+        params.append(schedule_type)
+    
+    if customer_supplier_name:
+        conditions.append("customer_supplier_name = ?")
+        params.append(customer_supplier_name)
+    
+    if aging_period:
+        conditions.append("aging_period = ?")
+        params.append(aging_period)
+    
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
+    
+    c.execute(f'''
+        SELECT id, schedule_date, schedule_type, customer_supplier_name, invoice_number, po_number,
+               original_amount, current_balance, days_overdue, aging_period, notes, created_at
+        FROM aging_schedules 
+        WHERE {where_clause}
+        ORDER BY schedule_date DESC, customer_supplier_name
+    ''', params)
+    
+    return c.fetchall()
+
+def generate_aging_report(conn: sqlite3.Connection, schedule_date: str, schedule_type: str):
+    """
+    Generate an aging report for receivables or payables.
+    """
+    c = conn.cursor()
+    
+    if schedule_type == 'receivable':
+        # Get unpaid invoices
+        c.execute('''
+            SELECT customer_name, invoice_number, total_amount, paid_amount,
+                   (total_amount - paid_amount) as outstanding_balance,
+                   julianday(?) - julianday(issue_date) as days_outstanding
+            FROM invoices 
+            WHERE paid_amount < total_amount
+            ORDER BY customer_name, issue_date
+        ''', (schedule_date,))
+    else:  # payable
+        # Get unpaid purchase orders
+        c.execute('''
+            SELECT supplier_name, po_number, total_amount, received_total,
+                   (total_amount - received_total) as outstanding_balance,
+                   julianday(?) - julianday(order_date) as days_outstanding
+            FROM purchase_orders 
+            WHERE received_total < total_amount
+            ORDER BY supplier_name, order_date
+        ''', (schedule_date,))
+    
+    items = c.fetchall()
+    
+    # Process each item and add to aging schedule
+    for item in items:
+        if schedule_type == 'receivable':
+            customer_name, invoice_number, original_amount, paid_amount, current_balance, days_outstanding = item
+            days_overdue = max(0, int(days_outstanding))
+        else:
+            supplier_name, po_number, original_amount, received_total, current_balance, days_outstanding = item
+            customer_name = supplier_name
+            invoice_number = None
+            days_overdue = max(0, int(days_outstanding))
+        
+        # Determine aging period
+        if days_overdue <= 0:
+            aging_period = 'current'
+        elif days_overdue <= 30:
+            aging_period = '30_days'
+        elif days_overdue <= 60:
+            aging_period = '60_days'
+        elif days_overdue <= 90:
+            aging_period = '90_days'
+        else:
+            aging_period = 'over_90_days'
+        
+        # Add to aging schedule
+        add_aging_schedule(
+            conn=conn,
+            schedule_date=schedule_date,
+            schedule_type=schedule_type,
+            customer_supplier_name=customer_name,
+            original_amount=original_amount,
+            current_balance=current_balance,
+            days_overdue=days_overdue,
+            aging_period=aging_period,
+            invoice_number=invoice_number,
+            po_number=po_number if schedule_type == 'payable' else None,
+            notes=f"Auto-generated aging entry for {schedule_type}"
+        )
+    
+    return len(items)
+
+def get_payment_summary(conn: sqlite3.Connection, payment_type: str, start_date: str, end_date: str) -> dict:
+    """
+    Get payment summary for a date range.
+    """
+    c = conn.cursor()
+    
+    c.execute('''
+        SELECT 
+            COUNT(*) as total_payments,
+            SUM(cleared_amount) as total_cleared,
+            SUM(original_amount) as total_original,
+            AVG(cleared_amount) as avg_payment,
+            clearing_method,
+            COUNT(*) as method_count
+        FROM payment_clearings 
+        WHERE payment_type = ? AND clearing_date BETWEEN ? AND ?
+        GROUP BY clearing_method
+    ''', (payment_type, start_date, end_date))
+    
+    summary = {
+        'payment_type': payment_type,
+        'start_date': start_date,
+        'end_date': end_date,
+        'total_payments': 0,
+        'total_cleared': 0,
+        'total_original': 0,
+        'avg_payment': 0,
+        'methods': {}
+    }
+    
+    for row in c.fetchall():
+        total_payments, total_cleared, total_original, avg_payment, method, method_count = row
+        summary['total_payments'] += total_payments
+        summary['total_cleared'] += total_cleared or 0
+        summary['total_original'] += total_original or 0
+        summary['methods'][method] = {
+            'count': method_count,
+            'amount': total_cleared or 0
+        }
+    
+    if summary['total_payments'] > 0:
+        summary['avg_payment'] = summary['total_cleared'] / summary['total_payments']
+    
+    return summary

@@ -12,6 +12,7 @@ from pyledger.reports import balance_sheet, income_statement, cash_flow_report
 from pyledger.accounts import ChartOfAccounts
 from pyledger.invoices import InvoiceStatus, Invoice, InvoiceLine
 from pyledger.purchase_orders import PurchaseOrderStatus
+from pyledger.payment_clearing import PaymentClearingManager
 
 app = FastAPI(title="PyLedger Accounting API")
 
@@ -141,6 +142,59 @@ class PurchaseOrderReceiptIn(BaseModel):
     line_id: int
     received_quantity: float
     received_date: Optional[date] = None
+
+# --- Payment Clearing Models ---
+class PaymentClearingIn(BaseModel):
+    invoice_number: str
+    payment_amount: float
+    payment_date: date
+    payment_reference: str
+    clearing_method: str = "partial"
+
+class MultiplePaymentClearingIn(BaseModel):
+    invoice_numbers: List[str]
+    total_payment_amount: float
+    payment_date: date
+    payment_reference: str
+    allocation_method: str = "proportional"
+
+class AgingReportOut(BaseModel):
+    report_date: str
+    schedule_type: str
+    items_processed: int
+    aging_summary: dict
+    total_amount: float
+    total_count: int
+
+class PaymentSummaryOut(BaseModel):
+    payment_type: str
+    start_date: str
+    end_date: str
+    total_payments: int
+    total_cleared: float
+    total_original: float
+    avg_payment: float
+    methods: dict
+
+class OutstandingInvoiceOut(BaseModel):
+    invoice_number: str
+    customer_name: str
+    issue_date: str
+    due_date: str
+    total_amount: float
+    paid_amount: float
+    outstanding_amount: float
+    days_overdue: int
+
+class OutstandingPurchaseOrderOut(BaseModel):
+    po_number: str
+    supplier_name: str
+    order_date: str
+    expected_delivery_date: str
+    total_amount: float
+    received_total: float
+    outstanding_amount: float
+    days_overdue: int
 
 # --- Startup: ensure DB is initialized ---
 @app.on_event("startup")
@@ -436,3 +490,139 @@ def api_cash_flow():
         chart.accounts[code].balance = balance
     conn.close()
     return cash_flow_report(chart)
+
+# --- Payment Clearing Endpoints ---
+
+@app.post("/payment_clearing/single")
+def api_clear_single_invoice_payment(clearing: PaymentClearingIn):
+    """Clear payment for a single invoice with advanced tracking."""
+    try:
+        manager = PaymentClearingManager()
+        result = manager.clear_single_invoice_payment(
+            invoice_number=clearing.invoice_number,
+            payment_amount=clearing.payment_amount,
+            payment_date=clearing.payment_date.isoformat(),
+            payment_reference=clearing.payment_reference,
+            clearing_method=clearing.clearing_method
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Payment clearing failed: {str(e)}")
+
+@app.post("/payment_clearing/multiple")
+def api_clear_multiple_invoices_payment(clearing: MultiplePaymentClearingIn):
+    """Clear payment across multiple invoices with intelligent allocation."""
+    try:
+        manager = PaymentClearingManager()
+        result = manager.clear_multiple_invoices_payment(
+            invoice_numbers=clearing.invoice_numbers,
+            total_payment_amount=clearing.total_payment_amount,
+            payment_date=clearing.payment_date.isoformat(),
+            payment_reference=clearing.payment_reference,
+            allocation_method=clearing.allocation_method
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Multiple payment clearing failed: {str(e)}")
+
+@app.get("/payment_clearing/aging_report", response_model=AgingReportOut)
+def api_generate_aging_report(schedule_type: str = "receivable", report_date: Optional[str] = None):
+    """Generate an aging report for receivables or payables."""
+    try:
+        manager = PaymentClearingManager()
+        result = manager.generate_aging_report(
+            report_date=report_date,
+            schedule_type=schedule_type
+        )
+        return AgingReportOut(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Aging report generation failed: {str(e)}")
+
+@app.get("/payment_clearing/summary", response_model=PaymentSummaryOut)
+def api_get_payment_summary(payment_type: str, start_date: str, end_date: str):
+    """Get payment summary for a date range."""
+    try:
+        manager = PaymentClearingManager()
+        result = manager.get_payment_summary(payment_type, start_date, end_date)
+        return PaymentSummaryOut(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Payment summary generation failed: {str(e)}")
+
+@app.get("/payment_clearing/outstanding_invoices", response_model=List[OutstandingInvoiceOut])
+def api_get_outstanding_invoices(customer_name: Optional[str] = None):
+    """Get list of outstanding invoices."""
+    try:
+        manager = PaymentClearingManager()
+        invoices = manager.get_outstanding_invoices(customer_name)
+        return [OutstandingInvoiceOut(**invoice) for invoice in invoices]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get outstanding invoices: {str(e)}")
+
+@app.get("/payment_clearing/outstanding_purchase_orders", response_model=List[OutstandingPurchaseOrderOut])
+def api_get_outstanding_purchase_orders(supplier_name: Optional[str] = None):
+    """Get list of outstanding purchase orders."""
+    try:
+        manager = PaymentClearingManager()
+        purchase_orders = manager.get_outstanding_purchase_orders(supplier_name)
+        return [OutstandingPurchaseOrderOut(**po) for po in purchase_orders]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get outstanding purchase orders: {str(e)}")
+
+@app.get("/payment_clearing/clearings")
+def api_get_payment_clearings(payment_type: Optional[str] = None, customer_supplier_name: Optional[str] = None):
+    """Get payment clearing records with optional filtering."""
+    try:
+        conn = get_connection()
+        from pyledger.db import get_payment_clearings
+        clearings = get_payment_clearings(conn, payment_type, customer_supplier_name)
+        conn.close()
+        
+        return [{
+            'id': clearing[0],
+            'clearing_date': clearing[1],
+            'payment_type': clearing[2],
+            'payment_reference': clearing[3],
+            'invoice_number': clearing[4],
+            'po_number': clearing[5],
+            'customer_supplier_name': clearing[6],
+            'original_amount': clearing[7],
+            'cleared_amount': clearing[8],
+            'remaining_amount': clearing[9],
+            'clearing_method': clearing[10],
+            'notes': clearing[11],
+            'created_at': clearing[12]
+        } for clearing in clearings]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get payment clearings: {str(e)}")
+
+@app.get("/payment_clearing/aging_schedule")
+def api_get_aging_schedule(schedule_type: Optional[str] = None, 
+                          customer_supplier_name: Optional[str] = None,
+                          aging_period: Optional[str] = None):
+    """Get aging schedule records with optional filtering."""
+    try:
+        conn = get_connection()
+        from pyledger.db import get_aging_schedule
+        schedule = get_aging_schedule(conn, schedule_type, customer_supplier_name, aging_period)
+        conn.close()
+        
+        return [{
+            'id': item[0],
+            'schedule_date': item[1],
+            'schedule_type': item[2],
+            'customer_supplier_name': item[3],
+            'invoice_number': item[4],
+            'po_number': item[5],
+            'original_amount': item[6],
+            'current_balance': item[7],
+            'days_overdue': item[8],
+            'aging_period': item[9],
+            'notes': item[10],
+            'created_at': item[11]
+        } for item in schedule]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get aging schedule: {str(e)}")
