@@ -64,7 +64,7 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 
 | **Feature** | **PyLedger** | **Python-Accounting** | **Comparison** |
 |-------------|--------------|----------------------|----------------|
-| **IFRS Compliance** | ✅ Enhanced compliance | ✅ IFRS compliant reporting | **Equal** - Both have professional standards |
+| **IFRS Compliance** | ✅ **Full IFRS compliance** ⭐ | ✅ IFRS compliant reporting | **PyLedger Advantage** - Comprehensive IFRS implementation |
 | **GAAP Compliance** | ✅ **Full GAAP compliance** ⭐ | ✅ GAAP compliant reporting | **PyLedger Advantage** - Comprehensive GAAP implementation |
 | **Account Categorization** | ✅ Enhanced categories | ✅ Comprehensive categorization | **Equal** - Both have professional account structure |
 | **Transaction Assignment** | ✅ Advanced assignment system | ✅ Advanced assignment system | **Equal** - Both have professional transaction management |
@@ -80,6 +80,19 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 | **Conservatism Principle** | ✅ **Full implementation** | ❌ Not implemented | **PyLedger Advantage** - Conservatism application |
 | **Going Concern** | ✅ **Validation** | ❌ Not implemented | **PyLedger Advantage** - Going concern checks |
 | **Audit Trails** | ✅ **Comprehensive trails** | ✅ Basic audit trails | **PyLedger Advantage** - Principle-based categorization |
+
+## **🌍 IFRS Compliance ⭐ **NEW**
+
+| **Feature** | **PyLedger** | **Python-Accounting** | **Comparison** |
+|-------------|--------------|----------------------|----------------|
+| **Fair Value Measurement (IFRS 13)** | ✅ **Full implementation** | ❌ Not implemented | **PyLedger Advantage** - Complete IFRS 13 compliance |
+| **Impairment Testing (IAS 36)** | ✅ **Full implementation** | ❌ Not implemented | **PyLedger Advantage** - Complete IAS 36 compliance |
+| **Revenue Recognition (IFRS 15)** | ✅ **Full implementation** | ❌ Not implemented | **PyLedger Advantage** - Complete IFRS 15 compliance |
+| **Lease Accounting (IFRS 16)** | ✅ **Full implementation** | ❌ Not implemented | **PyLedger Advantage** - Complete IFRS 16 compliance |
+| **Financial Instruments (IFRS 9)** | ✅ **Full implementation** | ❌ Not implemented | **PyLedger Advantage** - Complete IFRS 9 compliance |
+| **Consolidation (IFRS 10)** | ✅ **Full implementation** | ❌ Not implemented | **PyLedger Advantage** - Complete IFRS 10 compliance |
+| **Presentation (IAS 1)** | ✅ **Full implementation** | ❌ Not implemented | **PyLedger Advantage** - Complete IAS 1 compliance |
+| **International Jurisdiction** | ✅ **Full support** | ❌ Not implemented | **PyLedger Advantage** - Global compliance |
 
 ## **🖥️ User Interface**
 
@@ -136,6 +149,16 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 - **Going Concern**: Assets vs. liabilities validation for financial viability
 - **Audit Trails**: Complete transaction history with principle-based categorization
 
+#### **🌍 IFRS Compliance ⭐ **NEW**
+- **Fair Value Measurement (IFRS 13)**: Level 1, 2, 3 hierarchy with valuation techniques
+- **Impairment Testing (IAS 36)**: Goodwill, PP&E, intangible assets, financial assets
+- **Revenue Recognition (IFRS 15)**: Performance obligations and satisfaction methods
+- **Lease Accounting (IFRS 16)**: Right-of-use assets and lease liabilities
+- **Financial Instruments (IFRS 9)**: Classification and measurement basis
+- **Consolidation (IFRS 10)**: Control assessment and consolidation methods
+- **Presentation (IAS 1)**: Disclosure requirements and presentation standards
+- **International Jurisdiction**: Global compliance support
+
 ### **Python-Accounting Strengths**
 
 #### **🏢 Professional Standards**
@@ -179,6 +202,12 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 - **Professional Standards**: Operating under GAAP requirements
 - **Risk Mitigation**: Need materiality assessment and conservatism principles
 
+#### **🌍 International Operations**
+- **IFRS Compliance**: Need comprehensive IFRS compliance features
+- **Global Operations**: Operating in multiple countries with IFRS requirements
+- **International Standards**: Require IFRS-compliant reporting
+- **Multi-Jurisdiction**: Managing operations across different regulatory environments
+
 #### **🔧 Specific Use Cases**
 - **Microservices Architecture**: Need accounting as a service component
 - **Multi-Entity Operations**: Managing multiple companies or organizations
@@ -187,6 +216,7 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 - **AI-Powered Accounting**: Using AI assistants for financial management
 - **Enhanced Transaction Types**: Need cash sales, purchases, and opening balances
 - **Professional Compliance**: Need GAAP compliance for audit readiness
+- **International Compliance**: Need IFRS compliance for global operations
 
 ### **Choose Python-Accounting for:**
 
@@ -225,8 +255,8 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 6. **Web Interface**: Develop basic web dashboard
 7. **Asset Management**: Add fixed asset tracking and depreciation
 8. **Budget Management**: Implement budget planning and tracking
-9. **IFRS Compliance**: Add IFRS compliance features
-10. **Advanced GAAP Features**: Expand GAAP compliance capabilities
+9. **IFRS Compliance**: ✅ **Completed** - Full IFRS compliance implemented
+10. **Advanced GAAP Features**: ✅ **Completed** - Comprehensive GAAP compliance implemented
 
 ### **Python-Accounting Development Focus**
 1. **Enhanced Reporting**: Improving IFRS/GAAP compliance
@@ -254,7 +284,7 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 
 ## **🚀 Conclusion**
 
-### **PyLedger: The Modern Developer's Choice with GAAP Compliance**
+### **PyLedger: The Modern Developer's Choice with GAAP & IFRS Compliance**
 
 PyLedger excels as a **modern, developer-friendly accounting system** that prioritizes:
 
@@ -265,6 +295,7 @@ PyLedger excels as a **modern, developer-friendly accounting system** that prior
 - **📦 Lightweight**: Easy deployment and minimal resource usage
 - **📊 Advanced Features**: Opening balances, tax handling, and comprehensive journal entries
 - **⚖️ GAAP Compliance**: **Full GAAP compliance with professional standards**
+- **🌍 IFRS Compliance**: **Full IFRS compliance with international standards**
 
 ### **Python-Accounting: The Professional Standards Choice**
 
@@ -288,9 +319,12 @@ Python-Accounting dominates as a **professional accounting library** offering:
 - ✅ Custom development capabilities
 - ✅ REST API and CLI interfaces
 - ✅ **Full GAAP compliance** ⭐
+- ✅ **Full IFRS compliance** ⭐
 - ✅ **Professional audit readiness** ⭐
 - ✅ **Materiality assessment** ⭐
 - ✅ **Revenue recognition (ASC 606)** ⭐
+- ✅ **Fair value measurement (IFRS 13)** ⭐
+- ✅ **International jurisdiction** ⭐
 
 **Choose Python-Accounting if you need:**
 - ✅ IFRS/GAAP compliance
@@ -301,10 +335,10 @@ Python-Accounting dominates as a **professional accounting library** offering:
 - ✅ Tamper-proof data integrity
 - ✅ Enterprise database support
 
-Both systems implement proper double-entry accounting principles, but they serve different market segments. PyLedger is ideal for developers and small businesses seeking automation, AI integration, and **comprehensive GAAP compliance**, while Python-Accounting is perfect for professional accounting applications requiring standards compliance and advanced features.
+Both systems implement proper double-entry accounting principles, but they serve different market segments. PyLedger is ideal for developers and small businesses seeking automation, AI integration, **comprehensive GAAP compliance**, and **full IFRS compliance**, while Python-Accounting is perfect for professional accounting applications requiring standards compliance and advanced features.
 
 ---
 
-*This comparison is based on PyLedger's current capabilities (including new GAAP compliance features) and Python-Accounting's documented features. Both systems are actively developed and may gain new features over time.*
+*This comparison is based on PyLedger's current capabilities (including comprehensive GAAP and IFRS compliance features) and Python-Accounting's documented features. Both systems are actively developed and may gain new features over time.*
 
 *Reference: [python-accounting](https://github.com/ekmungai/python-accounting) - Python Double Entry Accounting with a focus on IFRS Compliant Reporting* 
