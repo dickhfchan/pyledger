@@ -2,6 +2,7 @@ import sqlite3
 from typing import List, Optional, Tuple
 from pyledger.accounts import AccountType
 from pyledger.gaap_compliance import GAAPCompliance, GAAPPrinciple
+from pyledger.ifrs_compliance import IFRSCompliance, IFRSPrinciple
 
 DB_FILE = 'pyledger.db'
 
@@ -11,7 +12,7 @@ def get_connection(db_file: str = DB_FILE):
 def init_db(conn: sqlite3.Connection):
     """
     Create tables for accounts, journal_entries, journal_lines, invoices, purchase_orders,
-    payment_clearings, aging schedules, and GAAP compliance.
+    payment_clearings, aging schedules, GAAP compliance, and IFRS compliance.
     """
     c = conn.cursor()
     c.execute('''
@@ -148,8 +149,9 @@ def init_db(conn: sqlite3.Connection):
         )
     ''')
     
-    # Initialize GAAP compliance
+    # Initialize GAAP and IFRS compliance
     gaap = GAAPCompliance(conn)
+    ifrs = IFRSCompliance(conn)
     
     conn.commit()
 

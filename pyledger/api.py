@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import date
+import json
 from pyledger.accounts import AccountType
 from pyledger.db import (
     get_connection, init_db, add_account, list_accounts, add_journal_entry, list_journal_entries, get_journal_lines,
@@ -14,6 +15,7 @@ from pyledger.invoices import InvoiceStatus, Invoice, InvoiceLine
 from pyledger.purchase_orders import PurchaseOrderStatus
 from pyledger.payment_clearing import PaymentClearingManager
 from pyledger.gaap_compliance import GAAPCompliance, GAAPPrinciple, RevenueRecognitionMethod
+from pyledger.ifrs_compliance import IFRSCompliance, IFRSPrinciple, FairValueLevel, ImpairmentType
 
 app = FastAPI(title="PyLedger Accounting API")
 
@@ -231,6 +233,64 @@ class GAAPComplianceReportOut(BaseModel):
     audit_trail_summary: dict
     revenue_recognition_summary: List[tuple]
     materiality_summary: List[tuple]
+    last_updated: str
+
+# --- IFRS Compliance Models ---
+class FairValueMeasurementIn(BaseModel):
+    asset_code: str
+    fair_value: float
+    fair_value_level: str
+    valuation_technique: str
+    key_inputs: dict
+    sensitivity_analysis: Optional[str] = None
+
+class ImpairmentTestIn(BaseModel):
+    asset_code: str
+    impairment_type: str
+    carrying_amount: float
+    recoverable_amount: float
+    assumptions: dict
+
+class IFRSRevenueRecognitionIn(BaseModel):
+    contract_id: str
+    performance_obligation_id: str
+    total_contract_value: float
+    allocated_transaction_price: float
+    satisfaction_method: str
+    satisfaction_date: Optional[date] = None
+    progress_measurement: Optional[str] = None
+
+class LeaseAccountingIn(BaseModel):
+    lease_id: str
+    lease_type: str
+    lease_term_months: int
+    lease_payments: float
+    discount_rate: float
+    commencement_date: date
+
+class FinancialInstrumentIn(BaseModel):
+    instrument_id: str
+    instrument_type: str
+    classification: str
+    measurement_basis: str
+    fair_value: Optional[float] = None
+    amortized_cost: Optional[float] = None
+
+class ConsolidationIn(BaseModel):
+    parent_entity: str
+    subsidiary_entity: str
+    ownership_percentage: float
+    control_assessment: str
+    consolidation_method: str
+
+class IFRSComplianceReportOut(BaseModel):
+    compliance_status: str
+    jurisdiction: str
+    ifrs_audit_trail_summary: dict
+    fair_value_summary: List[tuple]
+    impairment_summary: List[tuple]
+    lease_summary: List[tuple]
+    financial_instruments_summary: List[tuple]
     last_updated: str
 
 # --- Startup: ensure DB is initialized ---
@@ -839,3 +899,204 @@ def api_get_audit_trail(principle: Optional[str] = None, user_id: Optional[str] 
         } for entry in entries]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get audit trail: {str(e)}")
+
+# --- IFRS Compliance Endpoints ---
+@app.post("/ifrs/fair_value_measurement")
+def api_measure_fair_value(measurement: FairValueMeasurementIn):
+    """Measure fair value per IFRS 13."""
+    try:
+        conn = get_connection()
+        ifrs = IFRSCompliance(conn)
+        
+        # Convert string to enum
+        fair_value_level = FairValueLevel(measurement.fair_value_level)
+        
+        result = ifrs.measure_fair_value(
+            asset_code=measurement.asset_code,
+            fair_value=measurement.fair_value,
+            fair_value_level=fair_value_level,
+            valuation_technique=measurement.valuation_technique,
+            key_inputs=measurement.key_inputs,
+            sensitivity_analysis=measurement.sensitivity_analysis
+        )
+        
+        conn.close()
+        return {"success": True, "message": "Fair value measurement recorded"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fair value measurement failed: {str(e)}")
+
+@app.post("/ifrs/impairment_test")
+def api_test_impairment(test: ImpairmentTestIn):
+    """Test for impairment per IAS 36."""
+    try:
+        conn = get_connection()
+        ifrs = IFRSCompliance(conn)
+        
+        # Convert string to enum
+        impairment_type = ImpairmentType(test.impairment_type)
+        
+        result = ifrs.test_impairment(
+            asset_code=test.asset_code,
+            impairment_type=impairment_type,
+            carrying_amount=test.carrying_amount,
+            recoverable_amount=test.recoverable_amount,
+            assumptions=test.assumptions
+        )
+        
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Impairment test failed: {str(e)}")
+
+@app.post("/ifrs/revenue_recognition")
+def api_recognize_revenue_ifrs15(recognition: IFRSRevenueRecognitionIn):
+    """Recognize revenue per IFRS 15."""
+    try:
+        conn = get_connection()
+        ifrs = IFRSCompliance(conn)
+        
+        result = ifrs.recognize_revenue_ifrs15(
+            contract_id=recognition.contract_id,
+            performance_obligation_id=recognition.performance_obligation_id,
+            total_contract_value=recognition.total_contract_value,
+            allocated_transaction_price=recognition.allocated_transaction_price,
+            satisfaction_method=recognition.satisfaction_method,
+            satisfaction_date=recognition.satisfaction_date.isoformat() if recognition.satisfaction_date else None,
+            progress_measurement=recognition.progress_measurement
+        )
+        
+        conn.close()
+        return {"success": True, "message": "IFRS 15 revenue recognition recorded"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"IFRS 15 revenue recognition failed: {str(e)}")
+
+@app.post("/ifrs/lease_accounting")
+def api_account_for_lease_ifrs16(lease: LeaseAccountingIn):
+    """Account for leases per IFRS 16."""
+    try:
+        conn = get_connection()
+        ifrs = IFRSCompliance(conn)
+        
+        result = ifrs.account_for_lease_ifrs16(
+            lease_id=lease.lease_id,
+            lease_type=lease.lease_type,
+            lease_term_months=lease.lease_term_months,
+            lease_payments=lease.lease_payments,
+            discount_rate=lease.discount_rate,
+            commencement_date=lease.commencement_date.isoformat()
+        )
+        
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"IFRS 16 lease accounting failed: {str(e)}")
+
+@app.post("/ifrs/financial_instruments")
+def api_classify_financial_instrument_ifrs9(instrument: FinancialInstrumentIn):
+    """Classify financial instruments per IFRS 9."""
+    try:
+        conn = get_connection()
+        ifrs = IFRSCompliance(conn)
+        
+        result = ifrs.classify_financial_instrument_ifrs9(
+            instrument_id=instrument.instrument_id,
+            instrument_type=instrument.instrument_type,
+            classification=instrument.classification,
+            measurement_basis=instrument.measurement_basis,
+            fair_value=instrument.fair_value,
+            amortized_cost=instrument.amortized_cost
+        )
+        
+        conn.close()
+        return {"success": True, "message": "IFRS 9 classification recorded"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"IFRS 9 classification failed: {str(e)}")
+
+@app.post("/ifrs/consolidation")
+def api_consolidate_entities_ifrs10(consolidation: ConsolidationIn):
+    """Consolidate entities per IFRS 10."""
+    try:
+        conn = get_connection()
+        ifrs = IFRSCompliance(conn)
+        
+        result = ifrs.consolidate_entities_ifrs10(
+            parent_entity=consolidation.parent_entity,
+            subsidiary_entity=consolidation.subsidiary_entity,
+            ownership_percentage=consolidation.ownership_percentage,
+            control_assessment=consolidation.control_assessment,
+            consolidation_method=consolidation.consolidation_method
+        )
+        
+        conn.close()
+        return {"success": True, "message": "IFRS 10 consolidation recorded"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"IFRS 10 consolidation failed: {str(e)}")
+
+@app.get("/ifrs/compliance_report", response_model=IFRSComplianceReportOut)
+def api_get_ifrs_compliance_report():
+    """Generate IFRS compliance report."""
+    try:
+        conn = get_connection()
+        ifrs = IFRSCompliance(conn)
+        
+        report = ifrs.get_ifrs_compliance_report()
+        
+        conn.close()
+        return IFRSComplianceReportOut(**report)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"IFRS compliance report generation failed: {str(e)}")
+
+@app.get("/ifrs/presentation_validation")
+def api_validate_ifrs_presentation():
+    """Validate IFRS presentation requirements per IAS 1."""
+    try:
+        conn = get_connection()
+        ifrs = IFRSCompliance(conn)
+        
+        result = ifrs.validate_ifrs_presentation()
+        
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"IFRS presentation validation failed: {str(e)}")
+
+@app.get("/ifrs/audit_trail")
+def api_get_ifrs_audit_trail(principle: Optional[str] = None, user_id: Optional[str] = None):
+    """Get IFRS audit trail entries."""
+    try:
+        conn = get_connection()
+        c = conn.cursor()
+        
+        query = "SELECT * FROM ifrs_audit_trail WHERE 1=1"
+        params = []
+        
+        if principle:
+            query += " AND principle = ?"
+            params.append(principle)
+        
+        if user_id:
+            query += " AND user_id = ?"
+            params.append(user_id)
+        
+        query += " ORDER BY timestamp DESC"
+        
+        c.execute(query, params)
+        entries = c.fetchall()
+        
+        conn.close()
+        
+        return [{
+            'id': entry[0],
+            'timestamp': entry[1],
+            'user_id': entry[2],
+            'action': entry[3],
+            'table_name': entry[4],
+            'record_id': entry[5],
+            'old_values': json.loads(entry[6]) if entry[6] else None,
+            'new_values': json.loads(entry[7]) if entry[7] else None,
+            'principle': entry[8],
+            'justification': entry[9],
+            'jurisdiction': entry[10]
+        } for entry in entries]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get IFRS audit trail: {str(e)}")
