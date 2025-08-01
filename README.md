@@ -12,6 +12,7 @@ A comprehensive, headless Python accounting application that implements double-e
 - **Tax Handling**: Automatic tax calculations with dedicated tax payable/receivable accounts
 - **Invoice Management**: Complete invoice system with customer management, line items, and payment tracking
 - **Purchase Order Management**: Full purchase order system with supplier management, receipt tracking, and status management
+- **Advanced Payment Clearing**: Sophisticated payment management with intelligent allocation, aging reports, and comprehensive tracking
 - **Financial Reports**: Balance Sheet, Income Statement, and Cash Flow reporting
 - **Multiple Interfaces**: CLI, REST API, and MCP server for AI assistant integration
 - **Database Persistence**: SQLite database with automatic balance updates
@@ -154,6 +155,16 @@ uvicorn pyledger.api:app --reload --host 0.0.0.0 --port 8000
 - `GET /purchase_orders/{po_number}/lines` - Get purchase order line items
 - `POST /purchase_orders/{po_number}/receipt` - Record purchase order receipt
 
+**Payment Clearing**
+- `POST /payment_clearing/single` - Clear payment for single invoice
+- `POST /payment_clearing/multiple` - Clear payment across multiple invoices with intelligent allocation
+- `GET /payment_clearing/aging_report` - Generate aging report for receivables/payables
+- `GET /payment_clearing/summary` - Get payment summary for date range
+- `GET /payment_clearing/outstanding_invoices` - List outstanding invoices
+- `GET /payment_clearing/outstanding_purchase_orders` - List outstanding purchase orders
+- `GET /payment_clearing/clearings` - Get payment clearing history
+- `GET /payment_clearing/aging_schedule` - Get detailed aging schedule
+
 **Reports**
 - `GET /reports/balance_sheet` - Generate balance sheet
 - `GET /reports/income_statement` - Generate income statement
@@ -263,6 +274,37 @@ curl -X POST "http://localhost:8000/purchase_orders/PO-001/receipt" \
   -H "Content-Type: application/json" \
   -d '{"line_id": 1, "received_quantity": 3}'
 
+# Clear payment for single invoice
+curl -X POST "http://localhost:8000/payment_clearing/single" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "invoice_number": "INV-001",
+    "payment_amount": 3000.0,
+    "payment_date": "2024-02-20",
+    "payment_reference": "PAY-001",
+    "clearing_method": "partial"
+  }'
+
+# Clear payment across multiple invoices with intelligent allocation
+curl -X POST "http://localhost:8000/payment_clearing/multiple" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "invoice_numbers": ["INV-002", "INV-003"],
+    "total_payment_amount": 5000.0,
+    "payment_date": "2024-02-25",
+    "payment_reference": "PAY-002",
+    "allocation_method": "proportional"
+  }'
+
+# Generate aging report for receivables
+curl "http://localhost:8000/payment_clearing/aging_report?schedule_type=receivable&report_date=2024-03-01"
+
+# Get payment summary for date range
+curl "http://localhost:8000/payment_clearing/summary?payment_type=receivable&start_date=2024-02-01&end_date=2024-03-01"
+
+# Get outstanding invoices
+curl "http://localhost:8000/payment_clearing/outstanding_invoices?customer_name=Acme%20Corp"
+
 ### MCP Server
 
 The MCP (Model Context Protocol) server allows AI assistants to interact with the accounting system.
@@ -302,6 +344,14 @@ python3 -m pyledger.mcp_server
 - `get_purchase_order` - Get purchase order details
 - `record_purchase_order_receipt` - Record purchase order receipt
 
+**Payment Clearing**
+- `clear_single_invoice_payment` - Clear payment for single invoice
+- `clear_multiple_invoices_payment` - Clear payment across multiple invoices
+- `generate_aging_report` - Generate aging report for receivables/payables
+- `get_payment_summary` - Get payment summary for date range
+- `get_outstanding_invoices` - List outstanding invoices
+- `get_outstanding_purchase_orders` - List outstanding purchase orders
+
 **Reports**
 - `balance_sheet` - Generate balance sheet
 - `income_statement` - Generate income statement
@@ -316,6 +366,7 @@ pyledger/
 ├── transaction_types.py # Transaction type management (cash sales, purchases, etc.)
 ├── invoices.py          # Invoice management system
 ├── purchase_orders.py   # Purchase order management system
+├── payment_clearing.py  # Advanced payment clearing system
 ├── reports.py           # Financial reporting functions
 ├── db.py               # Database operations
 ├── api.py              # FastAPI REST API
@@ -325,7 +376,8 @@ pyledger/
 ├── test_db.py          # Database function tests
 ├── test_mcp.py         # MCP server tests
 ├── test_pyledger.py    # Core functionality tests
-└── test_enhanced_features.py # Enhanced features test suite
+├── test_enhanced_features.py # Enhanced features test suite
+└── test_payment_clearing_aging.py # Payment clearing test suite
 ```
 
 ## Accounting Principles
@@ -349,6 +401,9 @@ python3 -m pyledger.accounting_tests
 # Run enhanced features tests
 python3 test_enhanced_features.py
 
+# Run payment clearing tests
+python3 test_payment_clearing_aging.py
+
 # Run specific test modules
 python3 -m pyledger.test_db
 python3 -m pyledger.test_mcp
@@ -361,6 +416,7 @@ The test suite validates:
 - **Comprehensive transaction types** (cash sales, purchases, opening balances)
 - **Advanced journal entries** with narration, quantities, and tax rates
 - **Tax handling** with automatic calculations
+- **Advanced payment clearing** with intelligent allocation and aging reports
 - **Accounting equation compliance**
 - **Double-entry validation**
 - **Revenue/expense tracking**
@@ -389,6 +445,8 @@ The SQLite database includes:
 - `invoice_lines` table: Invoice line items with quantities and prices
 - `purchase_orders` table: Purchase order management with supplier data
 - `purchase_order_lines` table: Purchase order line items with quantities and prices
+- `payment_clearings` table: Advanced payment clearing with allocation tracking
+- `aging_schedules` table: Aging analysis for receivables and payables
 
 ## License
 

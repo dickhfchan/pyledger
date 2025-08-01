@@ -26,10 +26,12 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 
 | **Feature** | **PyLedger** | **Python-Accounting** | **Comparison** |
 |-------------|--------------|----------------------|----------------|
-| **Payment Assignment** | ❌ Basic payment recording | ✅ Assignment system for clearing invoices | **Python-Accounting Advantage** - Advanced payment clearing |
-| **Receivable Management** | ✅ Basic tracking | ✅ Account statements and aging schedules | **Python-Accounting Advantage** - Comprehensive receivable management |
-| **Payable Management** | ✅ Basic tracking | ✅ Account statements and aging schedules | **Python-Accounting Advantage** - Comprehensive payable management |
-| **Aging Schedules** | ❌ Not implemented | ✅ Configurable aging periods | **Python-Accounting Advantage** - Professional aging analysis |
+| **Payment Assignment** | ✅ Advanced payment clearing with intelligent allocation | ✅ Assignment system for clearing invoices | **Equal** - Both have sophisticated payment clearing |
+| **Receivable Management** | ✅ Comprehensive tracking with aging reports | ✅ Account statements and aging schedules | **Equal** - Both have professional receivable management |
+| **Payable Management** | ✅ Comprehensive tracking with aging reports | ✅ Account statements and aging schedules | **Equal** - Both have professional payable management |
+| **Aging Schedules** | ✅ Configurable aging periods with detailed analysis | ✅ Configurable aging periods | **Equal** - Both have professional aging analysis |
+| **Multiple Invoice Clearing** | ✅ Intelligent allocation (proportional, oldest-first, largest-first) | ❌ Basic assignment | **PyLedger Advantage** - Advanced allocation algorithms |
+| **Payment Summaries** | ✅ Comprehensive payment summaries and statistics | ❌ Basic reporting | **PyLedger Advantage** - Advanced payment analytics |
 
 ## **📈 Financial Reporting**
 
@@ -38,8 +40,9 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 | **Income Statement** | ✅ Basic implementation | ✅ IFRS/GAAP compliant | **Python-Accounting Advantage** - Professional standards compliance |
 | **Balance Sheet** | ✅ Basic implementation | ✅ IFRS/GAAP compliant | **Python-Accounting Advantage** - Professional standards compliance |
 | **Cash Flow Statement** | ✅ Basic implementation | ✅ IFRS/GAAP compliant | **Python-Accounting Advantage** - Professional standards compliance |
-| **Account Statements** | ❌ Not implemented | ✅ Client and supplier statements | **Python-Accounting Advantage** - Professional account management |
-| **Aging Reports** | ❌ Not implemented | ✅ Configurable aging schedules | **Python-Accounting Advantage** - Professional collection management |
+| **Account Statements** | ✅ Outstanding invoice and purchase order tracking | ✅ Client and supplier statements | **Equal** - Both have professional account management |
+| **Aging Reports** | ✅ Comprehensive aging analysis with detailed breakdowns | ✅ Configurable aging schedules | **Equal** - Both have professional collection management |
+| **Payment Analytics** | ✅ Payment summaries, statistics, and method breakdowns | ❌ Basic reporting | **PyLedger Advantage** - Advanced payment analytics |
 
 ## **🏢 Enterprise Features**
 
@@ -111,7 +114,7 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 - **Tax Handling**: Automatic tax calculations with dedicated tax accounts
 - **Invoice Management**: Complete invoice system with PDF generation
 - **Purchase Order Management**: Full purchase order system with receipts
-- **Payment Tracking**: Basic payment recording and tracking
+- **Advanced Payment Clearing**: Intelligent allocation, aging reports, and comprehensive tracking
 - **Real-time Reporting**: Instant balance sheet, income statement, and cash flow
 
 ### **Python-Accounting Strengths**
@@ -158,6 +161,7 @@ This document provides a detailed comparison between PyLedger and the [python-ac
 - **Automation Projects**: Integrating accounting with other business processes
 - **AI-Powered Accounting**: Using AI assistants for financial management
 - **Enhanced Transaction Types**: Need cash sales, purchases, and opening balances
+- **Advanced Payment Management**: Need sophisticated payment clearing and aging analysis
 
 ### **Choose Python-Accounting for:**
 
@@ -231,7 +235,7 @@ PyLedger excels as a **modern, developer-friendly accounting system** that prior
 - **🤖 AI Integration**: Built-in support for AI assistants
 - **💻 Developer Experience**: Modern Python with comprehensive APIs
 - **📦 Lightweight**: Easy deployment and minimal resource usage
-- **📊 Advanced Features**: Opening balances, tax handling, and comprehensive journal entries
+- **📊 Advanced Features**: Opening balances, tax handling, comprehensive journal entries, and advanced payment clearing
 
 ### **Python-Accounting: The Professional Standards Choice**
 
@@ -251,6 +255,8 @@ Python-Accounting dominates as a **professional accounting library** offering:
 - ✅ Multi-entity support
 - ✅ Enhanced transaction types (cash sales, purchases, opening balances)
 - ✅ Advanced journal entries with narration and tax rates
+- ✅ Advanced payment clearing with intelligent allocation
+- ✅ Comprehensive aging reports and payment analytics
 - ✅ Cost-effective solution
 - ✅ Custom development capabilities
 - ✅ REST API and CLI interfaces
