@@ -2,6 +2,10 @@
 
 A comprehensive, headless Python accounting application that implements double-entry bookkeeping with CLI, REST API, and MCP (Model Context Protocol) interfaces. **Now with full GAAP compliance!**
 
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GAAP Compliant](https://img.shields.io/badge/GAAP-Compliant-green.svg)](https://en.wikipedia.org/wiki/Generally_Accepted_Accounting_Principles)
+
 ## 🚀 Features
 
 ### Core Accounting
@@ -32,6 +36,7 @@ A comprehensive, headless Python accounting application that implements double-e
 - **Database Persistence**: SQLite database with automatic balance updates
 - **Professional Testing**: Comprehensive test suite validating accounting principles
 - **PDF Generation**: Professional invoice PDF generation with modern design
+- **Modern Python**: Leverages Python 3.12+ features for better performance and type safety
 
 ## 📦 Installation
 
@@ -81,13 +86,19 @@ python3 -m pyledger.main db-cash-sale
 python3 -m pyledger.main db-add-entry
 ```
 
-### 4. Generate Reports
+### 4. Test Everything Works
 ```bash
 # Run accounting tests to verify everything works
 python3 -m pyledger.accounting_tests
 
 # Test GAAP compliance
 python3 -m pyledger.gaap_compliance_tests
+```
+
+### 5. Start the API Server
+```bash
+# Start the REST API server
+uvicorn pyledger.api:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## 📋 Usage
@@ -554,4 +565,57 @@ For detailed comparisons between PyLedger and other accounting systems:
 - **Enhanced Features**: Opening balances, advanced journal entries, tax handling
 - **AI Integration**: Built-in MCP server for AI assistant interaction
 - **Lightweight**: Simple SQLite database, easy deployment
-- **Open Source**: MIT license with full code access 
+- **Open Source**: MIT license with full code access
+
+## 🚀 Getting Started with GAAP Compliance
+
+### Quick GAAP Compliance Setup
+
+```python
+from pyledger.gaap_compliance import GAAPCompliance, RevenueRecognitionMethod
+
+# Initialize GAAP compliance
+gaap = GAAPCompliance(conn)
+
+# Revenue recognition
+gaap.validate_revenue_recognition(
+    invoice_number='INV-2024-001',
+    recognition_method=RevenueRecognitionMethod.POINT_IN_TIME,
+    performance_obligations=["Delivery of goods"]
+)
+
+# Materiality assessment
+assessment = gaap.assess_materiality(
+    assessment_type="journal_entry",
+    actual_amount=5000.0
+)
+
+# Conservatism principle
+gaap.apply_conservatism(
+    account_code='1100',
+    adjustment_amount=1000.0,
+    reason="Conservative estimate for doubtful accounts"
+)
+
+# Generate compliance report
+report = gaap.get_gaap_compliance_report()
+```
+
+### GAAP Compliance Testing
+
+```bash
+# Run comprehensive GAAP compliance tests
+python3 -m pyledger.gaap_compliance_tests
+
+# Expected output:
+# 🧪 Running GAAP Compliance Test Suite
+# ✅ All GAAP compliance tests passed!
+# 📊 GAAP Compliance Test Results:
+#    ✅ Passed: 10
+#    ❌ Failed: 0
+#    📈 Success Rate: 100.0%
+```
+
+---
+
+**PyLedger** - Professional accounting with full GAAP compliance, modern Python, and comprehensive testing. Perfect for developers, small businesses, and professional accounting practices! 🎉 
