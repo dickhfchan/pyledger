@@ -1,6 +1,7 @@
 import sqlite3
 from typing import List, Optional, Tuple
 from pyledger.accounts import AccountType
+from pyledger.gaap_compliance import GAAPCompliance, GAAPPrinciple
 
 DB_FILE = 'pyledger.db'
 
@@ -10,7 +11,7 @@ def get_connection(db_file: str = DB_FILE):
 def init_db(conn: sqlite3.Connection):
     """
     Create tables for accounts, journal_entries, journal_lines, invoices, purchase_orders,
-    payment_clearings, and aging schedules.
+    payment_clearings, aging schedules, and GAAP compliance.
     """
     c = conn.cursor()
     c.execute('''
@@ -147,6 +148,9 @@ def init_db(conn: sqlite3.Connection):
         )
     ''')
     
+    # Initialize GAAP compliance
+    gaap = GAAPCompliance(conn)
+    
     conn.commit()
 
 def add_account(conn: sqlite3.Connection, code: str, name: str, type: AccountType, balance: float = 0.0):
@@ -177,18 +181,41 @@ def list_accounts(conn: sqlite3.Connection) -> List[Tuple[str, str, str, float]]
 def add_journal_entry(conn: sqlite3.Connection, description: str, lines: List[Tuple[str, float, bool]]):
     """
     Add a journal entry and its lines. 'lines' is a list of (account_code, amount, is_debit).
+    Includes GAAP compliance validation.
     """
     c = conn.cursor()
+    
+    # Validate double-entry principle (debits = credits)
+    total_debits = sum(amount for _, amount, is_debit in lines if is_debit)
+    total_credits = sum(amount for _, amount, is_debit in lines if not is_debit)
+    
+    if abs(total_debits - total_credits) > 0.01:
+        raise ValueError(f"Journal entry not balanced: Debits({total_debits}) != Credits({total_credits})")
+    
+    # Initialize GAAP compliance
+    gaap = GAAPCompliance(conn)
+    
+    # Assess materiality of the transaction
+    total_amount = total_debits
+    materiality_assessment = gaap.assess_materiality(
+        assessment_type="journal_entry",
+        actual_amount=total_amount
+    )
+    
     c.execute('INSERT INTO journal_entries (description) VALUES (?)', (description,))
     entry_id = c.lastrowid
+    
     for account_code, amount, is_debit in lines:
         c.execute('INSERT INTO journal_lines (entry_id, account_code, amount, is_debit) VALUES (?, ?, ?, ?)',
                   (entry_id, account_code, amount, int(is_debit)))
+        
         # Update account balance
         c.execute('SELECT type, balance FROM accounts WHERE code = ?', (account_code,))
         row = c.fetchone()
         if row:
             acc_type, balance = row
+            old_balance = balance
+            
             if is_debit:
                 if acc_type in ['ASSET', 'EXPENSE']:
                     balance += amount
@@ -199,7 +226,22 @@ def add_journal_entry(conn: sqlite3.Connection, description: str, lines: List[Tu
                     balance -= amount
                 else:
                     balance += amount
+            
             c.execute('UPDATE accounts SET balance = ? WHERE code = ?', (balance, account_code))
+            
+            # Log audit trail for significant changes
+            if abs(amount) >= materiality_assessment['threshold_amount']:
+                gaap.log_audit_trail(
+                    user_id="system",
+                    action="journal_entry",
+                    table_name="accounts",
+                    record_id=account_code,
+                    old_values={"balance": old_balance},
+                    new_values={"balance": balance},
+                    principle=GAAPPrinciple.CONSISTENCY,
+                    justification=f"Journal entry: {description}"
+                )
+    
     conn.commit()
     return entry_id
 
@@ -224,6 +266,7 @@ def add_invoice(conn: sqlite3.Connection, invoice_number: str, customer_name: st
                 issue_date: str, due_date: str, status: str, notes: str, lines: List[Tuple[str, float, float, float]]):
     """
     Add an invoice and its lines. 'lines' is a list of (description, quantity, unit_price, tax_rate).
+    Includes GAAP revenue recognition.
     """
     c = conn.cursor()
     
@@ -251,6 +294,21 @@ def add_invoice(conn: sqlite3.Connection, invoice_number: str, customer_name: st
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (invoice_number, description, quantity, unit_price, tax_rate,
               line_subtotal, line_tax, line_total))
+    
+    # Initialize GAAP compliance for revenue recognition
+    from pyledger.gaap_compliance import GAAPCompliance, RevenueRecognitionMethod
+    
+    gaap = GAAPCompliance(conn)
+    
+    # Default to point-in-time recognition for standard invoices
+    # This can be overridden for specific contracts
+    gaap.validate_revenue_recognition(
+        invoice_number=invoice_number,
+        recognition_method=RevenueRecognitionMethod.POINT_IN_TIME,
+        performance_obligations=["Delivery of goods/services"],
+        start_date=issue_date,
+        end_date=issue_date
+    )
     
     conn.commit()
 

@@ -1,23 +1,39 @@
 # PyLedger - Professional Double-Entry Accounting System
 
-A comprehensive, headless Python accounting application that implements double-entry bookkeeping with CLI, REST API, and MCP (Model Context Protocol) interfaces.
+A comprehensive, headless Python accounting application that implements double-entry bookkeeping with CLI, REST API, and MCP (Model Context Protocol) interfaces. **Now with full GAAP compliance!**
 
-## Features
+## 🚀 Features
 
+### Core Accounting
 - **Multi-Entity Support**: Manage multiple companies/organizations with isolated data
 - **Double-Entry Accounting**: Full implementation of double-entry bookkeeping principles
 - **Enhanced Account Management**: Opening balances, opening dates, and comprehensive account structure
 - **Comprehensive Transaction Types**: Cash sales, cash purchases, opening balances, and standard journal entries
 - **Advanced Journal Entries**: Narration, quantity tracking, unit prices, and tax rate support
 - **Tax Handling**: Automatic tax calculations with dedicated tax payable/receivable accounts
+
+### Business Document Management
 - **Invoice Management**: Complete invoice system with customer management, line items, and payment tracking
 - **Purchase Order Management**: Full purchase order system with supplier management, receipt tracking, and status management
+- **Payment Clearing**: Advanced payment clearing with aging schedules and reconciliation
 - **Financial Reports**: Balance Sheet, Income Statement, and Cash Flow reporting
+
+### GAAP Compliance ⭐ **NEW**
+- **Revenue Recognition (ASC 606)**: Point-in-time and over-time recognition methods
+- **Expense Matching**: Links expenses to related revenues with matching ratios
+- **Materiality**: Automatic assessment with customizable thresholds (default: 5% of total assets)
+- **Consistency**: Method consistency tracking with change justification
+- **Conservatism**: Understate assets, overstate liabilities for prudent reporting
+- **Going Concern**: Assets vs. liabilities validation for financial viability
+- **Audit Trails**: Complete transaction history with principle-based categorization
+
+### Technical Features
 - **Multiple Interfaces**: CLI, REST API, and MCP server for AI assistant integration
 - **Database Persistence**: SQLite database with automatic balance updates
 - **Professional Testing**: Comprehensive test suite validating accounting principles
+- **PDF Generation**: Professional invoice PDF generation with modern design
 
-## Installation
+## 📦 Installation
 
 ### Prerequisites
 - Python 3.12+ (required for modern type hints and features)
@@ -39,10 +55,46 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e .
 ```
 
-## Usage
+## 🎯 Quick Start
+
+### 1. Initialize the System
+```bash
+# Initialize database
+python3 -m pyledger.main db-init
+
+# Add your first entity
+python3 -m pyledger.main db-add-entity
+```
+
+### 2. Set Up Chart of Accounts
+```bash
+# Add accounts with opening balances
+python3 -m pyledger.main db-add-account
+```
+
+### 3. Create Your First Transaction
+```bash
+# Create a cash sale
+python3 -m pyledger.main db-cash-sale
+
+# Or create a journal entry
+python3 -m pyledger.main db-add-entry
+```
+
+### 4. Generate Reports
+```bash
+# Run accounting tests to verify everything works
+python3 -m pyledger.accounting_tests
+
+# Test GAAP compliance
+python3 -m pyledger.gaap_compliance_tests
+```
+
+## 📋 Usage
 
 ### CLI Interface
 
+#### Database Management
 ```bash
 # Initialize database
 python3 -m pyledger.main db-init
@@ -58,7 +110,10 @@ python3 -m pyledger.main db-add-account
 
 # List accounts
 python3 -m pyledger.main db-list-accounts
+```
 
+#### Journal Entries & Transactions
+```bash
 # Add journal entries
 python3 -m pyledger.main db-add-entry
 
@@ -76,7 +131,10 @@ python3 -m pyledger.main db-cash-purchase
 
 # Create opening balance transaction
 python3 -m pyledger.main db-opening-balance
+```
 
+#### Invoice Management
+```bash
 # Add invoice
 python3 -m pyledger.main db-add-invoice
 
@@ -91,7 +149,10 @@ python3 -m pyledger.main db-record-invoice-payment
 
 # Generate PDF invoice
 python3 -m pyledger.main db-generate-invoice-pdf
+```
 
+#### Purchase Order Management
+```bash
 # Add purchase order
 python3 -m pyledger.main db-add-po
 
@@ -103,9 +164,15 @@ python3 -m pyledger.main db-get-po
 
 # Record purchase order receipt
 python3 -m pyledger.main db-record-po-receipt
+```
 
+#### Testing & Validation
+```bash
 # Run accounting tests
 python3 -m pyledger.accounting_tests
+
+# Run GAAP compliance tests
+python3 -m pyledger.gaap_compliance_tests
 ```
 
 ### REST API
@@ -115,7 +182,7 @@ Start the API server:
 uvicorn pyledger.api:app --reload --host 0.0.0.0 --port 8000
 ```
 
-#### API Endpoints
+#### Core API Endpoints
 
 **Entities**
 - `GET /entities` - List all entities
@@ -159,6 +226,24 @@ uvicorn pyledger.api:app --reload --host 0.0.0.0 --port 8000
 - `GET /reports/income_statement` - Generate income statement
 - `GET /reports/cash_flow` - Generate cash flow report
 
+#### GAAP Compliance API Endpoints ⭐ **NEW**
+
+**Revenue Recognition**
+- `POST /gaap/revenue_recognition` - Validate revenue recognition per ASC 606
+- `PUT /gaap/revenue_recognition/{invoice_number}` - Update revenue recognition
+
+**Expense Matching**
+- `POST /gaap/expense_matching` - Validate expense matching principle
+
+**Materiality & Conservatism**
+- `POST /gaap/materiality_assessment` - Assess materiality of transactions
+- `POST /gaap/conservatism` - Apply conservatism principle
+
+**Compliance Reporting**
+- `GET /gaap/going_concern` - Validate going concern assumption
+- `GET /gaap/compliance_report` - Generate GAAP compliance report
+- `GET /gaap/audit_trail` - Get audit trail entries
+
 #### Example API Usage
 
 ```bash
@@ -177,19 +262,6 @@ curl -X POST "http://localhost:8000/accounts" \
     "balance": 0.0,
     "opening_balance": 10000.0,
     "opening_date": "2024-01-01"
-  }'
-
-# Create a cash sale transaction
-curl -X POST "http://localhost:8000/transactions/cash-sale" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "description": "Sale of consulting services",
-    "entry_date": "2024-01-15",
-    "cash_account": "1000",
-    "revenue_account": "4000",
-    "amount": 5000.0,
-    "tax_rate": 0.1,
-    "reference": "INV-001"
   }'
 
 # Create a journal entry with enhanced features
@@ -222,46 +294,28 @@ curl -X POST "http://localhost:8000/journal_entries" \
     ]
   }'
 
-# Get balance sheet
-curl "http://localhost:8000/reports/balance_sheet"
-
-# Create an invoice
-curl -X POST "http://localhost:8000/invoices" \
+# GAAP Compliance - Revenue Recognition
+curl -X POST "http://localhost:8000/gaap/revenue_recognition" \
   -H "Content-Type: application/json" \
   -d '{
-    "invoice_number": "INV-001",
-    "customer_name": "Acme Corp",
-    "customer_address": "123 Main St, City, State",
-    "issue_date": "2024-01-15",
-    "due_date": "2024-02-15",
-    "lines": [
-      {"description": "Web Development Services", "quantity": 40, "unit_price": 100.0, "tax_rate": 0.1}
-    ]
+    "invoice_number": "INV-2024-001",
+    "recognition_method": "point_in_time",
+    "performance_obligations": ["Delivery of goods"],
+    "start_date": "2024-01-15",
+    "end_date": "2024-01-15"
   }'
 
-# Record invoice payment
-curl -X POST "http://localhost:8000/invoices/INV-001/payment" \
-  -H "Content-Type: application/json" \
-  -d '{"paid_amount": 4400.0}'
-
-# Create a purchase order
-curl -X POST "http://localhost:8000/purchase_orders" \
+# GAAP Compliance - Materiality Assessment
+curl -X POST "http://localhost:8000/gaap/materiality_assessment" \
   -H "Content-Type: application/json" \
   -d '{
-    "po_number": "PO-001",
-    "supplier_name": "Office Supplies Co",
-    "supplier_address": "456 Business Ave, City, State",
-    "order_date": "2024-01-10",
-    "expected_delivery_date": "2024-01-20",
-    "lines": [
-      {"description": "Office Chairs", "quantity": 5, "unit_price": 200.0, "tax_rate": 0.08}
-    ]
+    "assessment_type": "journal_entry",
+    "actual_amount": 5000.0
   }'
 
-# Record purchase order receipt
-curl -X POST "http://localhost:8000/purchase_orders/PO-001/receipt" \
-  -H "Content-Type: application/json" \
-  -d '{"line_id": 1, "received_quantity": 3}'
+# Get GAAP compliance report
+curl "http://localhost:8000/gaap/compliance_report"
+```
 
 ### MCP Server
 
@@ -307,28 +361,31 @@ python3 -m pyledger.mcp_server
 - `income_statement` - Generate income statement
 - `cash_flow_report` - Generate cash flow report
 
-## Project Structure
+## 🏗️ Project Structure
 
 ```
 pyledger/
-├── accounts.py          # Account and Chart of Accounts classes
-├── journal.py           # Journal entries and ledger
-├── transaction_types.py # Transaction type management (cash sales, purchases, etc.)
-├── invoices.py          # Invoice management system
-├── purchase_orders.py   # Purchase order management system
-├── reports.py           # Financial reporting functions
-├── db.py               # Database operations
-├── api.py              # FastAPI REST API
-├── mcp_server.py       # MCP server implementation
-├── main.py             # CLI interface
-├── accounting_tests.py  # Professional accounting test suite
-├── test_db.py          # Database function tests
-├── test_mcp.py         # MCP server tests
-├── test_pyledger.py    # Core functionality tests
+├── accounts.py              # Account and Chart of Accounts classes
+├── journal.py               # Journal entries and ledger
+├── transaction_types.py     # Transaction type management (cash sales, purchases, etc.)
+├── invoices.py              # Invoice management system
+├── purchase_orders.py       # Purchase order management system
+├── payment_clearing.py      # Payment clearing and aging schedules
+├── reports.py               # Financial reporting functions
+├── db.py                    # Database operations
+├── api.py                   # FastAPI REST API
+├── mcp_server.py            # MCP server implementation
+├── main.py                  # CLI interface
+├── gaap_compliance.py       # GAAP compliance module ⭐ NEW
+├── gaap_compliance_tests.py # GAAP compliance test suite ⭐ NEW
+├── accounting_tests.py      # Professional accounting test suite
+├── test_db.py               # Database function tests
+├── test_mcp.py              # MCP server tests
+├── test_pyledger.py         # Core functionality tests
 └── test_enhanced_features.py # Enhanced features test suite
 ```
 
-## Accounting Principles
+## 📊 Accounting Principles
 
 The system implements standard double-entry accounting:
 
@@ -338,13 +395,57 @@ The system implements standard double-entry accounting:
 - **Account Types**: Assets, Liabilities, Equity, Revenue, Expense
 - **Closing Entries**: Proper period-end closing procedures
 
-## Testing
+## ⚖️ GAAP Compliance
+
+PyLedger includes comprehensive GAAP (Generally Accepted Accounting Principles) compliance features:
+
+### GAAP Principles Implemented
+
+- **Revenue Recognition (ASC 606)**: Point-in-time and over-time recognition methods
+- **Expense Matching**: Links expenses to related revenues with matching ratios
+- **Materiality**: Automatic assessment with customizable thresholds (default: 5% of total assets)
+- **Consistency**: Method consistency tracking with change justification
+- **Conservatism**: Understate assets, overstate liabilities for prudent reporting
+- **Going Concern**: Assets vs. liabilities validation for financial viability
+- **Audit Trails**: Complete transaction history with principle-based categorization
+
+### GAAP Compliance Features
+
+- **Automated Validation**: All transactions validated against GAAP principles
+- **Real-Time Monitoring**: Continuous compliance checking
+- **Comprehensive Audit Trails**: Complete transaction history with before/after values
+- **Compliance Reporting**: Detailed GAAP compliance reports
+- **API Integration**: Full REST API support for GAAP compliance operations
+
+### GAAP Compliance Testing
+
+```bash
+# Run GAAP compliance tests
+python3 -m pyledger.gaap_compliance_tests
+```
+
+The GAAP compliance test suite validates:
+- Revenue recognition per ASC 606
+- Expense matching principle
+- Materiality assessment
+- Consistency checks
+- Conservatism principle
+- Going concern assumption
+- Audit trail functionality
+- Compliance report generation
+
+For detailed GAAP compliance documentation, see [GAAP_COMPLIANCE_DOCUMENTATION.md](GAAP_COMPLIANCE_DOCUMENTATION.md).
+
+## 🧪 Testing
 
 Run the comprehensive test suite:
 
 ```bash
-# Run all tests
+# Run all accounting tests
 python3 -m pyledger.accounting_tests
+
+# Run GAAP compliance tests
+python3 -m pyledger.gaap_compliance_tests
 
 # Run enhanced features tests
 python3 test_enhanced_features.py
@@ -361,6 +462,7 @@ The test suite validates:
 - **Comprehensive transaction types** (cash sales, purchases, opening balances)
 - **Advanced journal entries** with narration, quantities, and tax rates
 - **Tax handling** with automatic calculations
+- **GAAP compliance** with all major principles
 - **Accounting equation compliance**
 - **Double-entry validation**
 - **Revenue/expense tracking**
@@ -368,19 +470,11 @@ The test suite validates:
 - **Income statement accuracy**
 - **Real-world business scenarios**
 
-## Development
-
-### Adding New Features
-
-1. Create feature branch: `git checkout -b feature/new-feature`
-2. Implement changes
-3. Add tests
-4. Run test suite: `python3 -m pyledger.accounting_tests`
-5. Commit and push: `git commit -m "Add new feature" && git push`
-
-### Database Schema
+## 🗄️ Database Schema
 
 The SQLite database includes:
+
+### Core Tables
 - `entities` table: Multi-entity support with company/organization data
 - `accounts` table: Account information with opening balances and dates
 - `journal_entries` table: Journal entry metadata with transaction types
@@ -390,11 +484,39 @@ The SQLite database includes:
 - `purchase_orders` table: Purchase order management with supplier data
 - `purchase_order_lines` table: Purchase order line items with quantities and prices
 
-## License
+### GAAP Compliance Tables ⭐ **NEW**
+- `gaap_audit_trail` table: Complete audit trail with principle-based categorization
+- `revenue_recognition` table: Revenue recognition tracking per ASC 606
+- `expense_matching` table: Expense matching with ratios and periods
+- `materiality_assessments` table: Materiality assessments with thresholds
+- `consistency_checks` table: Method consistency tracking and changes
+
+## 🛠️ Development
+
+### Adding New Features
+
+1. Create feature branch: `git checkout -b feature/new-feature`
+2. Implement changes
+3. Add tests
+4. Run test suite: `python3 -m pyledger.accounting_tests`
+5. Commit and push: `git commit -m "Add new feature" && git push`
+
+### Key Benefits
+
+1. **Professional Standards**: Full GAAP compliance for professional accounting
+2. **Audit Readiness**: Complete audit trails and compliance reporting
+3. **Risk Mitigation**: Materiality assessment and conservatism principles
+4. **Automated Validation**: Real-time GAAP compliance checking
+5. **Comprehensive Reporting**: Detailed GAAP compliance reports
+6. **Multi-Interface Support**: CLI, REST API, and MCP server
+7. **Modern Python**: Leverages Python 3.12+ features
+8. **Open Source**: MIT license with full code access
+
+## 📄 License
 
 This project is licensed under the MIT License.
 
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -403,13 +525,33 @@ This project is licensed under the MIT License.
 5. Ensure all tests pass
 6. Submit a pull request
 
-## Support
+## 🆘 Support
 
 For issues and questions, please open an issue on GitHub.
 
-## Comparison with Other Systems
+## 📊 Comparison with Other Systems
 
 For detailed comparisons between PyLedger and other accounting systems:
 
 - **PyLedger vs Odoo**: See [ODOO_COMPARISON.md](ODOO_COMPARISON.md)
-- **PyLedger vs Python-Accounting**: See [PYTHON_ACCOUNTING_COMPARISON.md](PYTHON_ACCOUNTING_COMPARISON.md) 
+- **PyLedger vs Python-Accounting**: See [PYTHON_ACCOUNTING_COMPARISON.md](PYTHON_ACCOUNTING_COMPARISON.md)
+
+## 🎯 Use Cases
+
+### Perfect For:
+- **Small to Medium Businesses**: Cost-effective accounting solution
+- **Developers**: API-first approach with programmatic access
+- **AI Integration**: Built-in MCP server for AI assistant interaction
+- **Multi-Entity Operations**: Managing multiple companies/organizations
+- **Professional Accounting**: Full GAAP compliance for audit readiness
+- **Automation Projects**: Integrating accounting with other business processes
+- **Headless Applications**: Building applications without web interfaces
+
+### Key Advantages:
+- **Modern Architecture**: API-first design with CLI and MCP interfaces
+- **GAAP Compliant**: Professional accounting standards
+- **Multi-Entity Support**: Full support for multiple companies/organizations
+- **Enhanced Features**: Opening balances, advanced journal entries, tax handling
+- **AI Integration**: Built-in MCP server for AI assistant interaction
+- **Lightweight**: Simple SQLite database, easy deployment
+- **Open Source**: MIT license with full code access 

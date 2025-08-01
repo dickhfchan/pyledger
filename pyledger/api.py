@@ -13,6 +13,7 @@ from pyledger.accounts import ChartOfAccounts
 from pyledger.invoices import InvoiceStatus, Invoice, InvoiceLine
 from pyledger.purchase_orders import PurchaseOrderStatus
 from pyledger.payment_clearing import PaymentClearingManager
+from pyledger.gaap_compliance import GAAPCompliance, GAAPPrinciple, RevenueRecognitionMethod
 
 app = FastAPI(title="PyLedger Accounting API")
 
@@ -195,6 +196,42 @@ class OutstandingPurchaseOrderOut(BaseModel):
     received_total: float
     outstanding_amount: float
     days_overdue: int
+
+# --- GAAP Compliance Models ---
+class RevenueRecognitionIn(BaseModel):
+    invoice_number: str
+    recognition_method: str
+    performance_obligations: List[str]
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+
+class RevenueRecognitionUpdateIn(BaseModel):
+    completion_percentage: float
+
+class ExpenseMatchingIn(BaseModel):
+    expense_account: str
+    revenue_account: str
+    expense_amount: float
+    revenue_amount: float
+    matching_period: str
+    justification: str
+
+class MaterialityAssessmentIn(BaseModel):
+    assessment_type: str
+    actual_amount: float
+    threshold_amount: Optional[float] = None
+
+class ConservatismAdjustmentIn(BaseModel):
+    account_code: str
+    adjustment_amount: float
+    reason: str
+
+class GAAPComplianceReportOut(BaseModel):
+    compliance_status: str
+    audit_trail_summary: dict
+    revenue_recognition_summary: List[tuple]
+    materiality_summary: List[tuple]
+    last_updated: str
 
 # --- Startup: ensure DB is initialized ---
 @app.on_event("startup")
@@ -626,3 +663,179 @@ def api_get_aging_schedule(schedule_type: Optional[str] = None,
         } for item in schedule]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get aging schedule: {str(e)}")
+
+# --- GAAP Compliance Endpoints ---
+
+@app.post("/gaap/revenue_recognition")
+def api_validate_revenue_recognition(recognition: RevenueRecognitionIn):
+    """Validate revenue recognition per ASC 606."""
+    try:
+        conn = get_connection()
+        gaap = GAAPCompliance(conn)
+        
+        # Convert string to enum
+        method_map = {
+            "point_in_time": RevenueRecognitionMethod.POINT_IN_TIME,
+            "over_time": RevenueRecognitionMethod.OVER_TIME,
+            "percentage_of_completion": RevenueRecognitionMethod.PERCENTAGE_OF_COMPLETION,
+            "completed_contract": RevenueRecognitionMethod.COMPLETED_CONTRACT
+        }
+        
+        recognition_method = method_map.get(recognition.recognition_method.lower())
+        if not recognition_method:
+            raise ValueError(f"Invalid recognition method: {recognition.recognition_method}")
+        
+        result = gaap.validate_revenue_recognition(
+            invoice_number=recognition.invoice_number,
+            recognition_method=recognition_method,
+            performance_obligations=recognition.performance_obligations,
+            start_date=recognition.start_date.isoformat() if recognition.start_date else None,
+            end_date=recognition.end_date.isoformat() if recognition.end_date else None
+        )
+        
+        conn.close()
+        return {"success": True, "message": "Revenue recognition validated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Revenue recognition validation failed: {str(e)}")
+
+@app.put("/gaap/revenue_recognition/{invoice_number}")
+def api_update_revenue_recognition(invoice_number: str, update: RevenueRecognitionUpdateIn):
+    """Update revenue recognition based on completion percentage."""
+    try:
+        conn = get_connection()
+        gaap = GAAPCompliance(conn)
+        
+        result = gaap.update_revenue_recognition(
+            invoice_number=invoice_number,
+            completion_percentage=update.completion_percentage
+        )
+        
+        conn.close()
+        return {"success": True, "message": "Revenue recognition updated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Revenue recognition update failed: {str(e)}")
+
+@app.post("/gaap/expense_matching")
+def api_validate_expense_matching(matching: ExpenseMatchingIn):
+    """Validate expense matching principle."""
+    try:
+        conn = get_connection()
+        gaap = GAAPCompliance(conn)
+        
+        result = gaap.validate_expense_matching(
+            expense_account=matching.expense_account,
+            revenue_account=matching.revenue_account,
+            expense_amount=matching.expense_amount,
+            revenue_amount=matching.revenue_amount,
+            matching_period=matching.matching_period,
+            justification=matching.justification
+        )
+        
+        conn.close()
+        return {"success": True, "message": "Expense matching validated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Expense matching validation failed: {str(e)}")
+
+@app.post("/gaap/materiality_assessment")
+def api_assess_materiality(assessment: MaterialityAssessmentIn):
+    """Assess materiality of a transaction or account."""
+    try:
+        conn = get_connection()
+        gaap = GAAPCompliance(conn)
+        
+        result = gaap.assess_materiality(
+            assessment_type=assessment.assessment_type,
+            actual_amount=assessment.actual_amount,
+            threshold_amount=assessment.threshold_amount
+        )
+        
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Materiality assessment failed: {str(e)}")
+
+@app.post("/gaap/conservatism")
+def api_apply_conservatism(adjustment: ConservatismAdjustmentIn):
+    """Apply conservatism principle (understate assets, overstate liabilities)."""
+    try:
+        conn = get_connection()
+        gaap = GAAPCompliance(conn)
+        
+        result = gaap.apply_conservatism(
+            account_code=adjustment.account_code,
+            adjustment_amount=adjustment.adjustment_amount,
+            reason=adjustment.reason
+        )
+        
+        conn.close()
+        return {"success": True, "message": "Conservatism principle applied"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Conservatism application failed: {str(e)}")
+
+@app.get("/gaap/going_concern")
+def api_validate_going_concern():
+    """Validate going concern assumption."""
+    try:
+        conn = get_connection()
+        gaap = GAAPCompliance(conn)
+        
+        result = gaap.validate_going_concern()
+        
+        conn.close()
+        return {"going_concern_viable": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Going concern validation failed: {str(e)}")
+
+@app.get("/gaap/compliance_report", response_model=GAAPComplianceReportOut)
+def api_get_gaap_compliance_report():
+    """Generate GAAP compliance report."""
+    try:
+        conn = get_connection()
+        gaap = GAAPCompliance(conn)
+        
+        report = gaap.get_gaap_compliance_report()
+        
+        conn.close()
+        return GAAPComplianceReportOut(**report)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"GAAP compliance report generation failed: {str(e)}")
+
+@app.get("/gaap/audit_trail")
+def api_get_audit_trail(principle: Optional[str] = None, user_id: Optional[str] = None):
+    """Get GAAP audit trail entries."""
+    try:
+        conn = get_connection()
+        c = conn.cursor()
+        
+        query = "SELECT * FROM gaap_audit_trail WHERE 1=1"
+        params = []
+        
+        if principle:
+            query += " AND principle = ?"
+            params.append(principle)
+        
+        if user_id:
+            query += " AND user_id = ?"
+            params.append(user_id)
+        
+        query += " ORDER BY timestamp DESC"
+        
+        c.execute(query, params)
+        entries = c.fetchall()
+        
+        conn.close()
+        
+        return [{
+            'id': entry[0],
+            'timestamp': entry[1],
+            'user_id': entry[2],
+            'action': entry[3],
+            'table_name': entry[4],
+            'record_id': entry[5],
+            'old_values': json.loads(entry[6]) if entry[6] else None,
+            'new_values': json.loads(entry[7]) if entry[7] else None,
+            'principle': entry[8],
+            'justification': entry[9]
+        } for entry in entries]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get audit trail: {str(e)}")
