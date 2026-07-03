@@ -30,6 +30,8 @@ dependencies = [
     "uvicorn[standard]>=0.24.0",
     "pydantic>=2.5.0",
     "mcp>=1.0.0",
+    "reportlab>=4.0.0",
+    "pypdf>=5.0.0",
 ]
 
 [project.optional-dependencies]
@@ -69,6 +71,10 @@ python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["reportlab.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["pyledger"]

@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 from pyledger.accounts import AccountType, ChartOfAccounts
 from pyledger.journal import JournalLine, JournalEntry, Ledger
 from pyledger.reports import balance_sheet, income_statement, cash_flow_report
@@ -359,6 +360,210 @@ def db_record_purchase_order_receipt_cmd():
     print('Receipt recorded.')
     conn.close()
 
+# --- Tax filing commands (Form 5472 / pro-forma 1120) ---
+
+def _tax_filing():
+    from pyledger.tax_filing import Form5472Filing
+    conn = get_connection()
+    init_db(conn)
+    return conn, Form5472Filing(conn)
+
+def _arg_or_input(args, name, prompt, cast=str):
+    value = getattr(args, name.replace('-', '_'), None)
+    if value is None:
+        value = input(prompt)
+    return cast(value)
+
+def tax_check_cmd(args):
+    conn, filing = _tax_filing()
+    entity_id = _arg_or_input(args, 'entity-id', 'Entity ID: ', int)
+    tax_year = _arg_or_input(args, 'tax-year', 'Tax year: ', int)
+    result = filing.check_filing_requirement(entity_id, tax_year)
+    print(f"Filing required: {'YES' if result['required'] else 'NO'}")
+    for reason in result['reasons']:
+        print(f"  - {reason}")
+    print(f"Forms needed: {', '.join(result['forms_needed']) or 'none'}")
+    print(f"Deadline: {result['deadline']} (extended: {result['extended_deadline']})")
+    print(f"E-file allowed: {'yes' if result['can_efile'] else 'NO — fax or mail only'}")
+    print(f"Fax: {result['submission']['fax']}")
+    print(f"Mail: {result['submission']['mail']}")
+    penalty = filing.estimate_penalty(tax_year)
+    print(f"Penalty exposure if unfiled today: ${penalty['total']:,.0f}")
+    print(f"\n{result['disclaimer']}")
+    conn.close()
+
+def tax_list_transactions_cmd(args):
+    conn, filing = _tax_filing()
+    entity_id = _arg_or_input(args, 'entity-id', 'Entity ID: ', int)
+    tax_year = _arg_or_input(args, 'tax-year', 'Tax year: ', int)
+    txns = filing.list_reportable_transactions(entity_id, tax_year)
+    if not txns:
+        print('No reportable transactions recorded.')
+    for t in txns:
+        print(f"#{t['id']} {t['txn_date'] or 'n/a'} {t['txn_type']} "
+              f"${t['amount']:,.2f} [{t['source']}] {t['description'] or ''}")
+    conn.close()
+
+def tax_5472_generate_cmd(args):
+    conn, filing = _tax_filing()
+    entity_id = _arg_or_input(args, 'entity-id', 'Entity ID: ', int)
+    tax_year = _arg_or_input(args, 'tax-year', 'Tax year: ', int)
+    output_dir = getattr(args, 'output_dir', None) or 'filings'
+    cause_text = None
+    if getattr(args, 'reasonable_cause_file', None):
+        with open(args.reasonable_cause_file) as fh:
+            cause_text = fh.read().strip()
+    result = filing.generate_filing(
+        entity_id, tax_year, output_dir,
+        include_extension=bool(getattr(args, 'extension', False)),
+        reasonable_cause_text=cause_text,
+        template_dir=getattr(args, 'template_dir', None))
+    if not result['success']:
+        print('Validation failed:')
+        for e in result['validation']['errors']:
+            print(f"  ERROR: {e}")
+        conn.close()
+        return
+    for w in result['validation']['warnings']:
+        print(f"  WARNING: {w}")
+    print('Generated:')
+    for k, v in result['paths'].items():
+        print(f"  {k}: {v}")
+    print('Next steps:')
+    for step in result['next_steps']:
+        print(f"  - {step}")
+    print(f"\n{result['disclaimer']}")
+    conn.close()
+
+def tax_7004_generate_cmd(args):
+    from pyledger import irs_pdf
+    conn, filing = _tax_filing()
+    entity_id = _arg_or_input(args, 'entity-id', 'Entity ID: ', int)
+    tax_year = _arg_or_input(args, 'tax-year', 'Tax year: ', int)
+    output_dir = getattr(args, 'output_dir', None) or 'filings'
+    entity = filing.get_entity(entity_id)
+    if entity is None:
+        print(f'Entity {entity_id} not found.')
+        conn.close()
+        return
+    os.makedirs(output_dir, exist_ok=True)
+    out = os.path.join(output_dir, f'f7004_{tax_year}.pdf')
+    templates = irs_pdf.IRSTemplateManager(
+        cache_dir=getattr(args, 'template_dir', None))
+    irs_pdf.fill_form_7004(templates.get_template('f7004'),
+                           irs_pdf.Form7004Data(entity=entity, tax_year=tax_year),
+                           out)
+    deadline = filing.get_deadline(tax_year, extended=True,
+                                   tax_year_end=entity['tax_year_end'])
+    print(f'Generated: {out}')
+    print(f'File by the regular deadline to extend filing to {deadline.isoformat()}.')
+    conn.close()
+
+def tax_5472_wizard_cmd(args):
+    conn, filing = _tax_filing()
+    print('=== Form 5472 / Pro-Forma 1120 Filing Wizard ===')
+    print('This wizard prepares the annual filing for a foreign-owned')
+    print('single-member US LLC (disregarded entity).\n')
+
+    # 1. Entity
+    entities = filing.list_entities()
+    if entities:
+        print('Existing entities:')
+        for e in entities:
+            print(f"  {e['id']}: {e['name']} ({e['entity_kind']}, EIN {e['ein'] or 'none'})")
+        choice = input('Entity ID to use (or ENTER to create new): ').strip()
+    else:
+        choice = ''
+    if choice:
+        entity_id = int(choice)
+    else:
+        print('\n-- New entity --')
+        name = input('LLC legal name: ')
+        ein = input('EIN (NN-NNNNNNN, ENTER if none yet): ').strip() or None
+        address1 = input('Street address: ')
+        city = input('City: ')
+        state = input('State (e.g. DE): ').strip() or None
+        postal = input('ZIP code: ').strip() or None
+        formed = input('Formation date (YYYY-MM-DD, ENTER to skip): ').strip() or None
+        activity = input('Principal business activity: ').strip() or None
+        entity_id = filing.add_entity(
+            name, 'foreign_owned_de', address1, city, ein=ein, state=state,
+            postal_code=postal, formation_date=formed,
+            principal_business_activity=activity)
+        print(f'Created entity #{entity_id}')
+
+    # 2. Owner
+    owners = filing.list_foreign_owners(entity_id)
+    if owners:
+        print(f"\nForeign owner on file: {owners[0]['name']} ({owners[0]['country']})")
+    else:
+        print('\n-- Foreign owner --')
+        oname = input('Owner full name: ')
+        ocountry = input('Country of residence: ')
+        oaddr = input('Street address: ')
+        ocity = input('City: ')
+        opostal = input('Postal code: ').strip() or None
+        oftin = input('Foreign tax ID (ENTER if none): ').strip() or None
+        ustin = input('US TIN/SSN/ITIN (ENTER if none): ').strip() or None
+        filing.add_foreign_owner(entity_id, oname, ocountry, oaddr, ocity,
+                                 postal_code=opostal, foreign_tin=oftin,
+                                 us_tin=ustin)
+
+    tax_year = int(input('\nTax year to file for: '))
+
+    # 3. Ledger suggestions
+    suggestions = filing.suggest_reportable_transactions(entity_id, tax_year)
+    if suggestions:
+        print(f'\nFound {len(suggestions)} possible reportable transaction(s) in the ledger:')
+        for s in suggestions:
+            answer = input(
+                f"  {s['date'] or 'n/a'} '{s['description']}' ${s['amount']:,.2f} "
+                f"-> {s['suggested_type']} ({s['confidence']}). Confirm? [y/N] ")
+            if answer.strip().lower() == 'y':
+                filing.confirm_suggested_transaction(
+                    entity_id, tax_year, s['journal_entry_id'],
+                    s['suggested_type'], s['amount'])
+                print('    recorded.')
+
+    # 4. Manual transactions
+    from pyledger.tax_filing import ReportableTransactionType
+    print('\n-- Additional reportable transactions --')
+    print('Types:', ', '.join(t.value for t in ReportableTransactionType))
+    while True:
+        ttype = input('Transaction type (ENTER to finish): ').strip()
+        if not ttype:
+            break
+        amount = float(input('Amount (USD): '))
+        desc = input('Description: ').strip() or None
+        tdate = input('Date (YYYY-MM-DD, ENTER to skip): ').strip() or None
+        filing.add_reportable_transaction(entity_id, tax_year, ttype, amount,
+                                          txn_date=tdate, description=desc)
+        print('  recorded.')
+
+    # 5. Validate + generate
+    validation = filing.validate_filing_data(entity_id, tax_year)
+    for w in validation['warnings']:
+        print(f'WARNING: {w}')
+    if not validation['valid']:
+        print('Cannot generate yet — fix these first:')
+        for e in validation['errors']:
+            print(f'  ERROR: {e}')
+        conn.close()
+        return
+    if input('\nGenerate the filing package now? [Y/n] ').strip().lower() in ('', 'y'):
+        output_dir = input('Output directory [filings]: ').strip() or 'filings'
+        include_ext = input('Also generate Form 7004 extension? [y/N] ').strip().lower() == 'y'
+        result = filing.generate_filing(entity_id, tax_year, output_dir,
+                                        include_extension=include_ext)
+        print('Generated:')
+        for k, v in result['paths'].items():
+            print(f'  {k}: {v}')
+        print('Next steps:')
+        for step in result['next_steps']:
+            print(f'  - {step}')
+        print(f"\n{result['disclaimer']}")
+    conn.close()
+
 def main():
     parser = argparse.ArgumentParser(description='PyLedger Accounting CLI')
     subparsers = parser.add_subparsers(dest='command')
@@ -391,6 +596,26 @@ def main():
     subparsers.add_parser('db-list-pos', help='List all purchase orders in the database')
     subparsers.add_parser('db-get-po', help='Get details for a specific purchase order')
     subparsers.add_parser('db-record-po-receipt', help='Record receipt of items for a purchase order')
+    # Tax filing commands (Form 5472 / pro-forma 1120)
+    p_check = subparsers.add_parser('tax-check', help='Check Form 5472 filing requirement, deadline, and penalty exposure')
+    p_check.add_argument('--entity-id', type=int)
+    p_check.add_argument('--tax-year', type=int)
+    subparsers.add_parser('tax-5472-wizard', help='Interactive wizard: prepare a Form 5472 + pro-forma 1120 filing')
+    p_gen = subparsers.add_parser('tax-5472-generate', help='Generate the Form 5472 filing package (non-interactive)')
+    p_gen.add_argument('--entity-id', type=int)
+    p_gen.add_argument('--tax-year', type=int)
+    p_gen.add_argument('--output-dir', default='filings')
+    p_gen.add_argument('--extension', action='store_true', help='Also generate Form 7004')
+    p_gen.add_argument('--reasonable-cause-file', help='Text file with reasonable-cause statement for late filing')
+    p_gen.add_argument('--template-dir', help='Directory with cached IRS PDF templates')
+    p_7004 = subparsers.add_parser('tax-7004-generate', help='Generate Form 7004 extension request')
+    p_7004.add_argument('--entity-id', type=int)
+    p_7004.add_argument('--tax-year', type=int)
+    p_7004.add_argument('--output-dir', default='filings')
+    p_7004.add_argument('--template-dir')
+    p_list = subparsers.add_parser('tax-list-transactions', help='List reportable transactions for an entity/year')
+    p_list.add_argument('--entity-id', type=int)
+    p_list.add_argument('--tax-year', type=int)
 
     args = parser.parse_args()
 
@@ -455,6 +680,17 @@ def main():
         db_get_purchase_order_cmd()
     elif args.command == 'db-record-po-receipt':
         db_record_purchase_order_receipt_cmd()
+    # Tax filing commands
+    elif args.command == 'tax-check':
+        tax_check_cmd(args)
+    elif args.command == 'tax-5472-wizard':
+        tax_5472_wizard_cmd(args)
+    elif args.command == 'tax-5472-generate':
+        tax_5472_generate_cmd(args)
+    elif args.command == 'tax-7004-generate':
+        tax_7004_generate_cmd(args)
+    elif args.command == 'tax-list-transactions':
+        tax_list_transactions_cmd(args)
     else:
         parser.print_help()
 

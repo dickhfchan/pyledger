@@ -73,6 +73,71 @@ class SuggestAccountMappingParams(BaseModel):
     amount: float = Field(description="Transaction amount")
 
 
+# --- Tax filing (Form 5472 / pro-forma 1120) parameter models ---
+
+class RegisterFilingEntityParams(BaseModel):
+    name: str = Field(description="Legal name of the US entity (LLC or corporation)")
+    entity_kind: str = Field(description="'foreign_owned_de' (single-member LLC) or 'foreign_owned_corporation'")
+    address_line1: str = Field(description="Street address")
+    city: str = Field(description="City")
+    state: Optional[str] = Field(default=None, description="US state, e.g. DE")
+    postal_code: Optional[str] = Field(default=None, description="ZIP code")
+    ein: Optional[str] = Field(default=None, description="EIN in NN-NNNNNNN format")
+    formation_date: Optional[str] = Field(default=None, description="Formation date (YYYY-MM-DD)")
+    principal_business_activity: Optional[str] = Field(default=None, description="Principal business activity")
+
+
+class AddForeignOwnerParams(BaseModel):
+    entity_id: int = Field(description="Filing entity ID")
+    name: str = Field(description="Owner's full legal name")
+    country: str = Field(description="Owner's country of residence")
+    address_line1: str = Field(description="Owner street address")
+    city: str = Field(description="Owner city")
+    postal_code: Optional[str] = Field(default=None, description="Postal code")
+    us_tin: Optional[str] = Field(default=None, description="US TIN/SSN/ITIN if any")
+    foreign_tin: Optional[str] = Field(default=None, description="Foreign tax ID if any")
+    ownership_pct: float = Field(default=100.0, description="Ownership percentage")
+
+
+class CheckFilingRequirementsParams(BaseModel):
+    entity_id: int = Field(description="Filing entity ID")
+    tax_year: int = Field(description="Tax year, e.g. 2025")
+
+
+class SuggestReportableTransactionsParams(BaseModel):
+    entity_id: int = Field(description="Filing entity ID")
+    tax_year: int = Field(description="Tax year to scan the ledger for")
+
+
+class RecordReportableTransactionParams(BaseModel):
+    entity_id: int = Field(description="Filing entity ID")
+    tax_year: int = Field(description="Tax year")
+    txn_type: str = Field(description="Reportable transaction type, e.g. capital_contribution, distribution, loan_from_owner, service_fees_paid, expenses_paid_by_owner, formation_dissolution_costs")
+    amount: float = Field(description="Transaction amount in USD (positive)")
+    txn_date: Optional[str] = Field(default=None, description="Transaction date (YYYY-MM-DD)")
+    description: Optional[str] = Field(default=None, description="Description")
+
+
+class ListReportableTransactionsParams(BaseModel):
+    entity_id: int = Field(description="Filing entity ID")
+    tax_year: int = Field(description="Tax year")
+
+
+class PrepareForm5472Params(BaseModel):
+    entity_id: int = Field(description="Filing entity ID")
+    tax_year: int = Field(description="Tax year to file for")
+    output_dir: str = Field(default="filings", description="Directory to write the PDFs")
+    include_extension: bool = Field(default=False, description="Also generate Form 7004 extension")
+    reasonable_cause_text: Optional[str] = Field(default=None, description="Reasonable-cause statement text for late filings")
+
+
+class EstimateFilingPenaltyParams(BaseModel):
+    tax_year: int = Field(description="Tax year the filing covers")
+    filed_date: Optional[str] = Field(default=None, description="Actual/planned filing date (YYYY-MM-DD)")
+    irs_notice_date: Optional[str] = Field(default=None, description="Date of IRS failure-to-file notice, if received (YYYY-MM-DD)")
+    num_forms: int = Field(default=1, description="Number of Forms 5472")
+
+
 ACCOUNTING_TOOLS = [
     {
         "type": "function",
@@ -176,6 +241,70 @@ ACCOUNTING_TOOLS = [
                 },
                 "required": ["check_type"]
             }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "register_filing_entity",
+            "description": "Register a US entity (foreign-owned single-member LLC or 25%+ foreign-owned corporation) for IRS Form 5472 tax filing.",
+            "parameters": RegisterFilingEntityParams.model_json_schema()
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_foreign_owner",
+            "description": "Register the foreign owner (25%+ shareholder) of a filing entity for Form 5472 reporting.",
+            "parameters": AddForeignOwnerParams.model_json_schema()
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "check_filing_requirements",
+            "description": "Check whether IRS Form 5472 + pro-forma 1120 filing is required for an entity and tax year; returns deadline, submission instructions (fax/mail), and penalty exposure.",
+            "parameters": CheckFilingRequirementsParams.model_json_schema()
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "suggest_reportable_transactions",
+            "description": "Scan the ledger for transactions that look like Form 5472 reportable transactions (capital contributions, distributions, owner loans, etc.).",
+            "parameters": SuggestReportableTransactionsParams.model_json_schema()
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "record_reportable_transaction",
+            "description": "Record a Form 5472 reportable transaction between the entity and its foreign owner.",
+            "parameters": RecordReportableTransactionParams.model_json_schema()
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_reportable_transactions",
+            "description": "List recorded Form 5472 reportable transactions for an entity and tax year.",
+            "parameters": ListReportableTransactionsParams.model_json_schema()
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "prepare_form_5472",
+            "description": "Generate the complete IRS filing package: filled Form 5472, pro-forma Form 1120 with 'Foreign-owned U.S. DE' banner, optional Form 7004 extension, and attachment statements.",
+            "parameters": PrepareForm5472Params.model_json_schema()
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "estimate_filing_penalty",
+            "description": "Estimate the IRC 6038A penalty exposure for a late or missed Form 5472 filing ($25,000 per form plus continuation penalties).",
+            "parameters": EstimateFilingPenaltyParams.model_json_schema()
         }
     },
     {

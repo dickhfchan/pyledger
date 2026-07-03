@@ -270,6 +270,125 @@ class PyLedgerMCPServer:
                     },
                     "required": ["po_number", "line_id", "received_quantity"]
                 }
+            ),
+            # Tax filing tools (IRS Form 5472 / pro-forma 1120)
+            Tool(
+                name="register_filing_entity",
+                description="Register a US entity (foreign-owned single-member LLC or 25%+ foreign-owned corporation) for IRS Form 5472 filing",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "Legal name"},
+                        "entity_kind": {"type": "string", "enum": ["foreign_owned_de", "foreign_owned_corporation"]},
+                        "address_line1": {"type": "string"},
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                        "postal_code": {"type": "string"},
+                        "ein": {"type": "string", "description": "EIN (NN-NNNNNNN)"},
+                        "formation_date": {"type": "string", "description": "YYYY-MM-DD"}
+                    },
+                    "required": ["name", "entity_kind", "address_line1", "city"]
+                }
+            ),
+            Tool(
+                name="add_foreign_owner",
+                description="Register the foreign owner (25%+ shareholder) of a filing entity",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "entity_id": {"type": "integer"},
+                        "name": {"type": "string"},
+                        "country": {"type": "string"},
+                        "address_line1": {"type": "string"},
+                        "city": {"type": "string"},
+                        "postal_code": {"type": "string"},
+                        "us_tin": {"type": "string"},
+                        "foreign_tin": {"type": "string"},
+                        "ownership_pct": {"type": "number", "default": 100.0}
+                    },
+                    "required": ["entity_id", "name", "country", "address_line1", "city"]
+                }
+            ),
+            Tool(
+                name="check_filing_requirements",
+                description="Check whether Form 5472 + pro-forma 1120 filing is required; returns deadline, fax/mail instructions, penalty exposure",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "entity_id": {"type": "integer"},
+                        "tax_year": {"type": "integer"}
+                    },
+                    "required": ["entity_id", "tax_year"]
+                }
+            ),
+            Tool(
+                name="suggest_reportable_transactions",
+                description="Scan the ledger for transactions that look like Form 5472 reportable transactions",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "entity_id": {"type": "integer"},
+                        "tax_year": {"type": "integer"}
+                    },
+                    "required": ["entity_id", "tax_year"]
+                }
+            ),
+            Tool(
+                name="record_reportable_transaction",
+                description="Record a Form 5472 reportable transaction (capital_contribution, distribution, loan_from_owner, service_fees_paid, expenses_paid_by_owner, formation_dissolution_costs, ...)",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "entity_id": {"type": "integer"},
+                        "tax_year": {"type": "integer"},
+                        "txn_type": {"type": "string"},
+                        "amount": {"type": "number"},
+                        "txn_date": {"type": "string", "description": "YYYY-MM-DD"},
+                        "description": {"type": "string"}
+                    },
+                    "required": ["entity_id", "tax_year", "txn_type", "amount"]
+                }
+            ),
+            Tool(
+                name="list_reportable_transactions",
+                description="List recorded Form 5472 reportable transactions for an entity and tax year",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "entity_id": {"type": "integer"},
+                        "tax_year": {"type": "integer"}
+                    },
+                    "required": ["entity_id", "tax_year"]
+                }
+            ),
+            Tool(
+                name="prepare_form_5472",
+                description="Generate the IRS filing package: filled Form 5472, pro-forma 1120 with DE banner, optional Form 7004 extension, and attachments",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "entity_id": {"type": "integer"},
+                        "tax_year": {"type": "integer"},
+                        "output_dir": {"type": "string", "default": "filings"},
+                        "include_extension": {"type": "boolean", "default": False},
+                        "reasonable_cause_text": {"type": "string"}
+                    },
+                    "required": ["entity_id", "tax_year"]
+                }
+            ),
+            Tool(
+                name="estimate_filing_penalty",
+                description="Estimate IRC 6038A penalty exposure for a late or missed Form 5472 filing",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "tax_year": {"type": "integer"},
+                        "filed_date": {"type": "string", "description": "YYYY-MM-DD"},
+                        "irs_notice_date": {"type": "string", "description": "YYYY-MM-DD"},
+                        "num_forms": {"type": "integer", "default": 1}
+                    },
+                    "required": ["tax_year"]
+                }
             )
         ]
 
@@ -690,6 +809,128 @@ class PyLedgerMCPServer:
                 
                 return CallToolResult(
                     content=[TextContent(type="text", text=f"Receipt of {received_quantity} items recorded for purchase order {po_number}")]
+                )
+
+            # Tax filing tools (IRS Form 5472 / pro-forma 1120)
+            elif tool_name == "register_filing_entity":
+                from pyledger.tax_filing import Form5472Filing
+                conn = get_connection()
+                init_db(conn)
+                filing = Form5472Filing(conn)
+                entity_id = filing.add_entity(
+                    args["name"], args["entity_kind"], args["address_line1"],
+                    args["city"], state=args.get("state"),
+                    postal_code=args.get("postal_code"), ein=args.get("ein"),
+                    formation_date=args.get("formation_date"))
+                conn.close()
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps({"entity_id": entity_id}))]
+                )
+
+            elif tool_name == "add_foreign_owner":
+                from pyledger.tax_filing import Form5472Filing
+                conn = get_connection()
+                init_db(conn)
+                filing = Form5472Filing(conn)
+                owner_id = filing.add_foreign_owner(
+                    args["entity_id"], args["name"], args["country"],
+                    args["address_line1"], args["city"],
+                    postal_code=args.get("postal_code"),
+                    us_tin=args.get("us_tin"),
+                    foreign_tin=args.get("foreign_tin"),
+                    ownership_pct=args.get("ownership_pct", 100.0))
+                conn.close()
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps({"owner_id": owner_id}))]
+                )
+
+            elif tool_name == "check_filing_requirements":
+                from pyledger.tax_filing import Form5472Filing
+                conn = get_connection()
+                init_db(conn)
+                filing = Form5472Filing(conn)
+                result = filing.check_filing_requirement(
+                    args["entity_id"], args["tax_year"])
+                result["penalty_if_unfiled"] = filing.estimate_penalty(args["tax_year"])
+                conn.close()
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(result, indent=2))]
+                )
+
+            elif tool_name == "suggest_reportable_transactions":
+                from pyledger.tax_filing import Form5472Filing
+                conn = get_connection()
+                init_db(conn)
+                filing = Form5472Filing(conn)
+                suggestions = filing.suggest_reportable_transactions(
+                    args["entity_id"], args["tax_year"])
+                conn.close()
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(
+                        {"suggestions": suggestions, "count": len(suggestions)}, indent=2))]
+                )
+
+            elif tool_name == "record_reportable_transaction":
+                from pyledger.tax_filing import Form5472Filing
+                conn = get_connection()
+                init_db(conn)
+                filing = Form5472Filing(conn)
+                txn_id = filing.add_reportable_transaction(
+                    args["entity_id"], args["tax_year"], args["txn_type"],
+                    args["amount"], txn_date=args.get("txn_date"),
+                    description=args.get("description"))
+                conn.close()
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps({"transaction_id": txn_id}))]
+                )
+
+            elif tool_name == "list_reportable_transactions":
+                from pyledger.tax_filing import Form5472Filing
+                conn = get_connection()
+                init_db(conn)
+                filing = Form5472Filing(conn)
+                result = {
+                    "transactions": filing.list_reportable_transactions(
+                        args["entity_id"], args["tax_year"]),
+                    "totals_by_type": filing.transaction_totals_by_type(
+                        args["entity_id"], args["tax_year"]),
+                }
+                conn.close()
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(result, indent=2))]
+                )
+
+            elif tool_name == "prepare_form_5472":
+                from pyledger.tax_filing import Form5472Filing
+                conn = get_connection()
+                init_db(conn)
+                filing = Form5472Filing(conn)
+                result = filing.generate_filing(
+                    args["entity_id"], args["tax_year"],
+                    args.get("output_dir", "filings"),
+                    include_extension=args.get("include_extension", False),
+                    reasonable_cause_text=args.get("reasonable_cause_text"))
+                conn.close()
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(result, indent=2))]
+                )
+
+            elif tool_name == "estimate_filing_penalty":
+                from datetime import date as _date
+                from pyledger.tax_filing import Form5472Filing
+                conn = get_connection()
+                init_db(conn)
+                filing = Form5472Filing(conn)
+                filed = args.get("filed_date")
+                notice = args.get("irs_notice_date")
+                result = filing.estimate_penalty(
+                    args["tax_year"],
+                    filed_date=_date.fromisoformat(filed) if filed else None,
+                    irs_notice_date=_date.fromisoformat(notice) if notice else None,
+                    num_forms=args.get("num_forms", 1))
+                conn.close()
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(result, indent=2))]
                 )
 
             else:

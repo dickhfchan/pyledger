@@ -18,10 +18,11 @@ from pyledger.payment_clearing import PaymentClearingManager
 from pyledger.gaap_compliance import GAAPCompliance, GAAPPrinciple, RevenueRecognitionMethod
 from pyledger.ifrs_compliance import IFRSCompliance, IFRSPrinciple, FairValueLevel, ImpairmentType
 
-# AI-Native modules are imported lazily so that core accounting works
-# without the optional (heavy) AI dependencies installed. Install with:
-#   pip install "pyledger[ai]"
-_AI_EXPORTS = {
+# AI-native and tax-filing modules are imported lazily so that core
+# accounting works without their optional/heavy dependencies installed.
+# AI: pip install "pyledger[ai]"   PDF generation: pypdf + reportlab.
+_LAZY_EXPORTS = {
+    # AI-native
     "ACCOUNTING_TOOLS": "pyledger.llm_tools",
     "get_tools_for_provider": "pyledger.llm_tools",
     "AccountingVectorStore": "pyledger.vector_store",
@@ -29,12 +30,18 @@ _AI_EXPORTS = {
     "AccountingAgent": "pyledger.agent",
     "AgentContext": "pyledger.agent",
     "create_agent": "pyledger.agent",
+    # Tax filing (IRS Form 5472 / pro-forma 1120)
+    "Form5472Filing": "pyledger.tax_filing",
+    "ReportableTransactionType": "pyledger.tax_filing",
+    "EntityKind": "pyledger.tax_filing",
+    "FilingStatus": "pyledger.tax_filing",
+    "IRSTemplateManager": "pyledger.irs_pdf",
 }
 
 
-def __getattr__(name):
-    """Lazily import AI-native symbols on first access (PEP 562)."""
-    module_path = _AI_EXPORTS.get(name)
+def __getattr__(name: str) -> object:
+    """Lazily import optional-module symbols on first access (PEP 562)."""
+    module_path = _LAZY_EXPORTS.get(name)
     if module_path is not None:
         import importlib
         module = importlib.import_module(module_path)
@@ -71,4 +78,8 @@ __all__ = [
     "ACCOUNTING_TOOLS", "get_tools_for_provider",
     "AccountingVectorStore", "TransactionEmbedder",
     "AccountingAgent", "AgentContext", "create_agent",
+
+    # Tax filing (IRS Form 5472 / pro-forma 1120)
+    "Form5472Filing", "ReportableTransactionType", "EntityKind",
+    "FilingStatus", "IRSTemplateManager",
 ]

@@ -72,6 +72,15 @@ class AccountingAgent:
             "suggest_account_mapping": self._handle_suggest_account_mapping,
             "validate_gaap_compliance": self._handle_validate_gaap_compliance,
             "get_audit_trail": self._handle_get_audit_trail,
+            # Tax filing (Form 5472 / pro-forma 1120)
+            "register_filing_entity": self._handle_register_filing_entity,
+            "add_foreign_owner": self._handle_add_foreign_owner,
+            "check_filing_requirements": self._handle_check_filing_requirements,
+            "suggest_reportable_transactions": self._handle_suggest_reportable_transactions,
+            "record_reportable_transaction": self._handle_record_reportable_transaction,
+            "list_reportable_transactions": self._handle_list_reportable_transactions,
+            "prepare_form_5472": self._handle_prepare_form_5472,
+            "estimate_filing_penalty": self._handle_estimate_filing_penalty,
         }
         
         # Context
@@ -623,6 +632,98 @@ Return JSON array of suggestions with account_code, account_name, account_type, 
             ],
             "count": len(entries)
         }
+
+    # Tax filing tool handlers (Form 5472 / pro-forma 1120)
+
+    def _tax_filing_manager(self):
+        from pyledger.tax_filing import Form5472Filing
+        return Form5472Filing(self.conn)
+
+    async def _handle_register_filing_entity(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Register a filing entity for Form 5472 reporting."""
+        filing = self._tax_filing_manager()
+        entity_id = filing.add_entity(
+            args["name"], args["entity_kind"], args["address_line1"],
+            args["city"], state=args.get("state"),
+            postal_code=args.get("postal_code"), ein=args.get("ein"),
+            formation_date=args.get("formation_date"),
+            principal_business_activity=args.get("principal_business_activity"),
+            user_id=self.context.user_id)
+        return {"entity_id": entity_id,
+                "message": f"Filing entity '{args['name']}' registered"}
+
+    async def _handle_add_foreign_owner(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Register a foreign owner for Form 5472 reporting."""
+        filing = self._tax_filing_manager()
+        owner_id = filing.add_foreign_owner(
+            args["entity_id"], args["name"], args["country"],
+            args["address_line1"], args["city"],
+            postal_code=args.get("postal_code"),
+            us_tin=args.get("us_tin"), foreign_tin=args.get("foreign_tin"),
+            ownership_pct=args.get("ownership_pct", 100.0),
+            user_id=self.context.user_id)
+        return {"owner_id": owner_id,
+                "message": f"Foreign owner '{args['name']}' registered"}
+
+    async def _handle_check_filing_requirements(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Check Form 5472 filing requirement for an entity/year."""
+        filing = self._tax_filing_manager()
+        result = filing.check_filing_requirement(
+            args["entity_id"], args["tax_year"])
+        result["penalty_if_unfiled"] = filing.estimate_penalty(
+            args["tax_year"])
+        return result
+
+    async def _handle_suggest_reportable_transactions(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Scan the ledger for likely reportable transactions."""
+        filing = self._tax_filing_manager()
+        suggestions = filing.suggest_reportable_transactions(
+            args["entity_id"], args["tax_year"])
+        return {"suggestions": suggestions, "count": len(suggestions)}
+
+    async def _handle_record_reportable_transaction(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Record a reportable transaction."""
+        filing = self._tax_filing_manager()
+        txn_id = filing.add_reportable_transaction(
+            args["entity_id"], args["tax_year"], args["txn_type"],
+            args["amount"], txn_date=args.get("txn_date"),
+            description=args.get("description"),
+            user_id=self.context.user_id)
+        return {"transaction_id": txn_id, "message": "Transaction recorded"}
+
+    async def _handle_list_reportable_transactions(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """List reportable transactions for an entity/year."""
+        filing = self._tax_filing_manager()
+        transactions = filing.list_reportable_transactions(
+            args["entity_id"], args["tax_year"])
+        totals = filing.transaction_totals_by_type(
+            args["entity_id"], args["tax_year"])
+        return {"transactions": transactions, "totals_by_type": totals,
+                "count": len(transactions)}
+
+    async def _handle_prepare_form_5472(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate the Form 5472 / pro-forma 1120 filing package."""
+        filing = self._tax_filing_manager()
+        return filing.generate_filing(
+            args["entity_id"], args["tax_year"],
+            args.get("output_dir", "filings"),
+            include_extension=args.get("include_extension", False),
+            reasonable_cause_text=args.get("reasonable_cause_text"),
+            user_id=self.context.user_id)
+
+    async def _handle_estimate_filing_penalty(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Estimate IRC 6038A late-filing penalty exposure."""
+        from datetime import date as _date
+        filing = self._tax_filing_manager()
+
+        def parse(key: str) -> Optional[Any]:
+            value = args.get(key)
+            return _date.fromisoformat(value) if value else None
+
+        return filing.estimate_penalty(
+            args["tax_year"], filed_date=parse("filed_date"),
+            irs_notice_date=parse("irs_notice_date"),
+            num_forms=args.get("num_forms", 1))
 
     def sync_vector_store(self) -> Dict[str, int]:
         """Sync all database data to vector store."""

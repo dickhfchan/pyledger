@@ -1100,3 +1100,171 @@ def api_get_ifrs_audit_trail(principle: Optional[str] = None, user_id: Optional[
         } for entry in entries]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get IFRS audit trail: {str(e)}")
+
+# ---------------------------------------------------------------------------
+# Tax filing endpoints (IRS Form 5472 / pro-forma 1120)
+# ---------------------------------------------------------------------------
+
+class FilingEntityIn(BaseModel):
+    name: str
+    entity_kind: str  # foreign_owned_de | foreign_owned_corporation
+    address_line1: str
+    city: str
+    state: Optional[str] = None
+    postal_code: Optional[str] = None
+    ein: Optional[str] = None
+    formation_date: Optional[str] = None
+    principal_business_activity: Optional[str] = None
+
+class ForeignOwnerIn(BaseModel):
+    name: str
+    country: str
+    address_line1: str
+    city: str
+    postal_code: Optional[str] = None
+    us_tin: Optional[str] = None
+    foreign_tin: Optional[str] = None
+    ownership_pct: float = 100.0
+
+class ReportableTransactionIn(BaseModel):
+    tax_year: int
+    txn_type: str
+    amount: float
+    txn_date: Optional[str] = None
+    description: Optional[str] = None
+
+class GenerateFilingIn(BaseModel):
+    tax_year: int
+    output_dir: str = "filings"
+    include_extension: bool = False
+    reasonable_cause_text: Optional[str] = None
+
+class MarkFiledIn(BaseModel):
+    filed_date: str
+    method: str  # mail | fax
+
+def _tax_manager(conn):
+    from pyledger.tax_filing import Form5472Filing
+    return Form5472Filing(conn)
+
+@app.post("/tax/entities")
+def create_filing_entity(entity: FilingEntityIn):
+    conn = get_connection()
+    init_db(conn)
+    try:
+        filing = _tax_manager(conn)
+        entity_id = filing.add_entity(
+            entity.name, entity.entity_kind, entity.address_line1,
+            entity.city, state=entity.state, postal_code=entity.postal_code,
+            ein=entity.ein, formation_date=entity.formation_date,
+            principal_business_activity=entity.principal_business_activity)
+        return {"entity_id": entity_id}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    finally:
+        conn.close()
+
+@app.get("/tax/entities")
+def list_filing_entities():
+    conn = get_connection()
+    init_db(conn)
+    try:
+        return _tax_manager(conn).list_entities()
+    finally:
+        conn.close()
+
+@app.post("/tax/entities/{entity_id}/owners")
+def add_foreign_owner(entity_id: int, owner: ForeignOwnerIn):
+    conn = get_connection()
+    init_db(conn)
+    try:
+        filing = _tax_manager(conn)
+        owner_id = filing.add_foreign_owner(
+            entity_id, owner.name, owner.country, owner.address_line1,
+            owner.city, postal_code=owner.postal_code, us_tin=owner.us_tin,
+            foreign_tin=owner.foreign_tin, ownership_pct=owner.ownership_pct)
+        return {"owner_id": owner_id}
+    finally:
+        conn.close()
+
+@app.get("/tax/entities/{entity_id}/filing-check")
+def check_filing_requirement(entity_id: int, tax_year: int):
+    conn = get_connection()
+    init_db(conn)
+    try:
+        filing = _tax_manager(conn)
+        result = filing.check_filing_requirement(entity_id, tax_year)
+        result["penalty_if_unfiled"] = filing.estimate_penalty(tax_year)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    finally:
+        conn.close()
+
+@app.get("/tax/entities/{entity_id}/transactions")
+def list_reportable_transactions(entity_id: int, tax_year: int):
+    conn = get_connection()
+    init_db(conn)
+    try:
+        filing = _tax_manager(conn)
+        return {
+            "transactions": filing.list_reportable_transactions(entity_id, tax_year),
+            "totals_by_type": filing.transaction_totals_by_type(entity_id, tax_year),
+        }
+    finally:
+        conn.close()
+
+@app.post("/tax/entities/{entity_id}/transactions")
+def record_reportable_transaction(entity_id: int, txn: ReportableTransactionIn):
+    conn = get_connection()
+    init_db(conn)
+    try:
+        filing = _tax_manager(conn)
+        txn_id = filing.add_reportable_transaction(
+            entity_id, txn.tax_year, txn.txn_type, txn.amount,
+            txn_date=txn.txn_date, description=txn.description)
+        return {"transaction_id": txn_id}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    finally:
+        conn.close()
+
+@app.get("/tax/entities/{entity_id}/transactions/suggestions")
+def suggest_reportable_transactions(entity_id: int, tax_year: int):
+    conn = get_connection()
+    init_db(conn)
+    try:
+        filing = _tax_manager(conn)
+        suggestions = filing.suggest_reportable_transactions(entity_id, tax_year)
+        return {"suggestions": suggestions, "count": len(suggestions)}
+    finally:
+        conn.close()
+
+@app.post("/tax/entities/{entity_id}/filings")
+def generate_filing(entity_id: int, req: GenerateFilingIn):
+    conn = get_connection()
+    init_db(conn)
+    try:
+        filing = _tax_manager(conn)
+        result = filing.generate_filing(
+            entity_id, req.tax_year, req.output_dir,
+            include_extension=req.include_extension,
+            reasonable_cause_text=req.reasonable_cause_text)
+        if not result["success"]:
+            raise HTTPException(status_code=422, detail=result["validation"])
+        return result
+    finally:
+        conn.close()
+
+@app.post("/tax/entities/{entity_id}/filings/{tax_year}/mark-filed")
+def mark_filing_filed(entity_id: int, tax_year: int, req: MarkFiledIn):
+    conn = get_connection()
+    init_db(conn)
+    try:
+        filing = _tax_manager(conn)
+        filing.mark_filed(entity_id, tax_year, req.filed_date, req.method)
+        return {"status": "filed"}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    finally:
+        conn.close()

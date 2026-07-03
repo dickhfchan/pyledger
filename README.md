@@ -447,6 +447,68 @@ The GAAP compliance test suite validates:
 
 For detailed GAAP compliance documentation, see [GAAP_COMPLIANCE_DOCUMENTATION.md](GAAP_COMPLIANCE_DOCUMENTATION.md).
 
+## 🇺🇸 IRS Form 5472 / Pro-Forma 1120 Filing (Foreign-Owned US LLCs)
+
+PyLedger prepares the annual IRS compliance filing required of foreign-owned
+US single-member LLCs (and 25%+ foreign-owned corporations) under IRC §6038A —
+the filing that carries a **$25,000 penalty per form per year** if missed.
+
+### What it does
+
+- **Filing-requirement check**: determines whether Form 5472 + pro-forma 1120
+  is required for an entity and tax year, with deadline (April 15 /
+  extended October 15) and penalty-exposure estimates
+- **Ledger scan**: suggests reportable transactions (capital contributions,
+  distributions, owner loans, expenses paid by owner, formation costs) from
+  your journal entries, by account mapping or keyword heuristics
+- **Official IRS PDFs**: downloads and fills the genuine `f5472.pdf`,
+  `f1120.pdf` (with the required "Foreign-owned U.S. DE" banner across the
+  top), and `f7004.pdf` extension templates from irs.gov
+- **Attachments**: generates the Part V statement for DE transactions and
+  reasonable-cause statements for late filings
+- **Audit trail**: every entity, owner, transaction, and generated filing is
+  logged in `tax_audit_trail`
+
+Foreign-owned DEs cannot e-file this filing; the generated package is
+print-ready for fax (855-887-7737) or mail (IRS Ogden, UT).
+
+### CLI
+
+```bash
+pyledger tax-5472-wizard        # interactive guided preparation
+pyledger tax-check --entity-id 1 --tax-year 2025
+pyledger tax-5472-generate --entity-id 1 --tax-year 2025 --extension
+pyledger tax-7004-generate --entity-id 1 --tax-year 2025
+pyledger tax-list-transactions --entity-id 1 --tax-year 2025
+```
+
+### Python API
+
+```python
+from pyledger import Form5472Filing
+from pyledger.db import get_connection, init_db
+
+conn = get_connection("pyledger.db")
+init_db(conn)
+filing = Form5472Filing(conn)
+
+entity_id = filing.add_entity("Acme LLC", "foreign_owned_de",
+                              "123 Main St", "Dover", state="DE",
+                              ein="12-3456789", formation_date="2025-03-01")
+filing.add_foreign_owner(entity_id, "Hans Mueller", "Germany",
+                         "Hauptstrasse 1", "Berlin", foreign_tin="DE123")
+filing.add_reportable_transaction(entity_id, 2025, "capital_contribution", 5000.0)
+
+print(filing.check_filing_requirement(entity_id, 2025))
+result = filing.generate_filing(entity_id, 2025, "filings/")
+```
+
+The same operations are exposed as REST endpoints (`/tax/...`), MCP tools,
+and AI-agent tools (`check_filing_requirements`, `prepare_form_5472`, ...).
+
+> **Disclaimer**: PyLedger assists with form preparation and is not tax
+> advice. Review all generated filings with a qualified tax professional.
+
 ## 🧪 Testing
 
 Run the comprehensive test suite:
