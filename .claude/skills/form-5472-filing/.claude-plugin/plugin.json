@@ -1,0 +1,11 @@
+{
+  "name": "pyledger-tax-filing",
+  "description": "IRS Form 5472 / pro-forma 1120 filing workflow for foreign-owned US entities, backed by pyledger's tax_filing module. Requires the pyledger package installed and a pyledger project root.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Dick Chan"
+  },
+  "homepage": "https://github.com/dickhfchan/pyledger",
+  "repository": "https://github.com/dickhfchan/pyledger",
+  "license": "MIT"
+}

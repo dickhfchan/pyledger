@@ -509,6 +509,22 @@ and AI-agent tools (`check_filing_requirements`, `prepare_form_5472`, ...).
 > **Disclaimer**: PyLedger assists with form preparation and is not tax
 > advice. Review all generated filings with a qualified tax professional.
 
+### Claude Code skill
+
+This repo doubles as a [Claude Code plugin marketplace](https://code.claude.com/docs/en/discover-plugins)
+serving a `form-5472-filing` skill that walks Claude through the full annual
+filing workflow (entity setup → ledger scan → validation → PDF generation):
+
+```shell
+/plugin marketplace add dickhfchan/pyledger
+/plugin install pyledger-tax-filing@pyledger
+```
+
+The skill requires the `pyledger` package installed and must be run from a
+project root containing `pyledger.db`. When working inside this repository
+itself, the skill is picked up automatically from `.claude/skills/` — no
+install needed.
+
 ## 🧪 Testing
 
 Run the comprehensive test suite:
