@@ -459,6 +459,97 @@ def tax_7004_generate_cmd(args):
     print(f'File by the regular deadline to extend filing to {deadline.isoformat()}.')
     conn.close()
 
+def tax_5472_sign_cmd(args):
+    from pyledger.tax_filing import PERJURY_DECLARATION
+    conn, filing = _tax_filing()
+    entity_id = _arg_or_input(args, 'entity-id', 'Entity ID: ', int)
+    tax_year = _arg_or_input(args, 'tax-year', 'Tax year: ', int)
+    name = _arg_or_input(args, 'name', 'Signer name (officer/owner): ')
+    title = _arg_or_input(args, 'title', 'Signer title (e.g. Owner): ')
+    print('\n=== Declaration (Form 1120 jurat) ===')
+    print(PERJURY_DECLARATION)
+    print('=====================================\n')
+    if not getattr(args, 'accept', False):
+        response = input(f'{name}, type AGREE to accept this declaration '
+                         'under penalty of perjury: ').strip()
+        if response != 'AGREE':
+            print('Declaration not accepted; nothing was signed.')
+            conn.close()
+            return
+    try:
+        result = filing.sign_filing(
+            entity_id, tax_year, name, title,
+            signed_date=getattr(args, 'date', None),
+            signature_image=getattr(args, 'signature_image', None))
+    except ValueError as e:
+        print(f'Error: {e}')
+        conn.close()
+        return
+    print(f"Signed pro-forma 1120: {result['signed_1120_path']}")
+    print(f"Signed by {result['signer_name']} ({result['signer_title']}) "
+          f"on {result['signed_date']}, {result['signature_kind']} signature.")
+    print('Declaration acceptance and document hashes recorded. '
+          'The fax step will only transmit these exact documents.')
+    conn.close()
+
+def tax_5472_fax_cmd(args):
+    from pyledger.fax_service import (
+        FilingFaxService, NotifyreProvider, FaxError, TERMINAL_STATUSES)
+    from pyledger.tax_filing import IRS_FAX_NUMBER
+    conn, filing = _tax_filing()
+    entity_id = _arg_or_input(args, 'entity-id', 'Entity ID: ', int)
+    tax_year = _arg_or_input(args, 'tax-year', 'Tax year: ', int)
+    to_number = getattr(args, 'to', None) or IRS_FAX_NUMBER
+    try:
+        service = FilingFaxService(filing, NotifyreProvider())
+        record = service.send_filing(
+            entity_id, tax_year, to_number=to_number,
+            allow_unsigned=getattr(args, 'unsigned', False))
+        print(f"Fax queued (transmission {record['id']}, "
+              f"provider fax {record['provider_fax_id']}) to {record['to_number']}")
+        print(f"Package: {record['package_path']}, merged from:")
+        for f in record['files']:
+            print(f'  - {f}')
+        if getattr(args, 'wait', False):
+            print('Waiting for delivery confirmation...')
+            record = service.wait_for_completion(
+                record['id'], timeout=getattr(args, 'timeout', 600))
+            print(f"Status: {record['status']}"
+                  + (f" ({record['num_pages']} pages)" if record['num_pages'] else ''))
+            if record['status'] == 'completed':
+                print('Delivery confirmed; filing marked as filed. '
+                      'Keep this confirmation as proof of transmission.')
+            elif record['status'] in TERMINAL_STATUSES:
+                print('Fax did not complete successfully. Re-send with '
+                      'tax-5472-fax or fall back to mail.')
+            else:
+                print(f"Still in progress. Check later with: "
+                      f"pyledger tax-fax-status --transmission-id {record['id']}")
+        else:
+            print(f"Check status with: pyledger tax-fax-status "
+                  f"--transmission-id {record['id']}")
+    except FaxError as e:
+        print(f'Fax error: {e}')
+    conn.close()
+
+def tax_fax_status_cmd(args):
+    from pyledger.fax_service import FilingFaxService, NotifyreProvider, FaxError
+    conn, filing = _tax_filing()
+    try:
+        service = FilingFaxService(filing, NotifyreProvider())
+        record = service.refresh_status(
+            _arg_or_input(args, 'transmission-id', 'Transmission ID: ', int))
+        print(f"Transmission {record['id']}: {record['status']}")
+        for k in ('provider_fax_id', 'to_number', 'num_pages',
+                  'failed_message', 'completed_at'):
+            if record.get(k) is not None:
+                print(f'  {k}: {record[k]}')
+        if record['status'] == 'completed':
+            print('Delivery confirmed; filing is marked as filed.')
+    except FaxError as e:
+        print(f'Fax error: {e}')
+    conn.close()
+
 def tax_5472_wizard_cmd(args):
     conn, filing = _tax_filing()
     print('=== Form 5472 / Pro-Forma 1120 Filing Wizard ===')
@@ -616,6 +707,23 @@ def main():
     p_list = subparsers.add_parser('tax-list-transactions', help='List reportable transactions for an entity/year')
     p_list.add_argument('--entity-id', type=int)
     p_list.add_argument('--tax-year', type=int)
+    p_sign = subparsers.add_parser('tax-5472-sign', help='Accept the perjury declaration and e-sign the pro-forma 1120')
+    p_sign.add_argument('--entity-id', type=int)
+    p_sign.add_argument('--tax-year', type=int)
+    p_sign.add_argument('--name', help='Signer name (officer/owner)')
+    p_sign.add_argument('--title', help='Signer title, e.g. Owner')
+    p_sign.add_argument('--date', help='Signature date (YYYY-MM-DD, default today)')
+    p_sign.add_argument('--signature-image', help='PNG of a handwritten signature (default: typed /s/ name)')
+    p_sign.add_argument('--accept', action='store_true', help='Skip the interactive AGREE prompt (only when acceptance was already given)')
+    p_fax = subparsers.add_parser('tax-5472-fax', help='Fax the generated filing package to the IRS via Notifyre')
+    p_fax.add_argument('--entity-id', type=int)
+    p_fax.add_argument('--tax-year', type=int)
+    p_fax.add_argument('--to', help='Override destination fax number (default: IRS 855-887-7737)')
+    p_fax.add_argument('--wait', action='store_true', help='Poll until delivery is confirmed')
+    p_fax.add_argument('--timeout', type=float, default=600, help='Max seconds to wait with --wait')
+    p_fax.add_argument('--unsigned', action='store_true', help='Send without a recorded e-signature (package signed manually)')
+    p_fax_status = subparsers.add_parser('tax-fax-status', help='Refresh and show the status of a fax transmission')
+    p_fax_status.add_argument('--transmission-id', type=int)
 
     args = parser.parse_args()
 
@@ -691,6 +799,12 @@ def main():
         tax_7004_generate_cmd(args)
     elif args.command == 'tax-list-transactions':
         tax_list_transactions_cmd(args)
+    elif args.command == 'tax-5472-sign':
+        tax_5472_sign_cmd(args)
+    elif args.command == 'tax-5472-fax':
+        tax_5472_fax_cmd(args)
+    elif args.command == 'tax-fax-status':
+        tax_fax_status_cmd(args)
     else:
         parser.print_help()
 

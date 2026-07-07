@@ -28,6 +28,26 @@ For late filings, pass `reasonable_cause_text` to `generate_filing` (or `--reaso
 - Sign the pro-forma 1120 (the 5472 itself is not signed for a DE filing). Keep copies and proof of transmission.
 - Record submission with `mark_filed(entity_id, tax_year, filed_date, method)` — method must be `"mail"` or `"fax"`.
 
+### Electronic signature (legal core)
+
+The pro-forma 1120 must be signed or the IRS can treat the return as never filed (which triggers the §6038A penalty and leaves the statute of limitations open). `Form5472Filing.sign_filing()` / `pyledger tax-5472-sign` implements an e-signature consistent with the IRS's acceptance of electronic signatures on paper-filed 1120-family returns:
+
+- Draws `/s/ <name>` (or a supplied signature PNG) on the officer signature line, the date in the Date column, and fills the Title form field of the 2025 Form 1120 template.
+- Records the exact jurat text (`PERJURY_DECLARATION`), signer, timestamp, and SHA-256 of every package PDF in `filing_declarations` — tying the declaration to the exact documents transmitted.
+- Acceptance is the taxpayer's personal act under penalty of perjury: always show the declaration verbatim and obtain explicit confirmation; the CLI prompts for a typed `AGREE` unless `--accept` is passed.
+- The fax step verifies these hashes and refuses unsigned or modified packages; regenerating the filing requires re-signing. `--unsigned` exists only for packages signed manually on paper.
+- Whether an e-signature is acceptable for a specific situation is a question for the user's tax professional — surface the disclaimer.
+
+### Built-in fax (Notifyre)
+
+`pyledger/fax_service.py` sends the package through the Notifyre fax API (`pyledger tax-5472-fax`, or `FilingFaxService` in Python). Details:
+
+- Auth: `NOTIFY_API_KEY` env var or `.env` in the working directory; `requests` must be installed.
+- The package PDFs (1120 on top, then 5472, then Part V / reasonable-cause statements — never the 7004, which is a separate transmission) are merged into `fax_package_{entity}_{year}.pdf` and sent as one fax at high quality.
+- Statuses normalize to `queued` / `in_progress` / `completed` / `failure`. On `completed`, the filing is marked filed automatically and the Notifyre receipt JSON is stored in `fax_transmissions.confirmation` — that is the proof of transmission; do not delete it.
+- On `failure`, check `failed_message` (busy line, bad number), re-run `tax-5472-fax`, or fall back to mail. A failed fax never marks the filing as filed.
+- The provider is an adapter (`FaxProvider`); to switch vendors, implement `send`/`get_status` and pass it to `FilingFaxService`.
+
 ## Validation rules
 
 `validate_filing_data(entity_id, tax_year)` gates generation. Errors (block): missing EIN or EIN not `NN-NNNNNNN`; missing entity address_line1/city; no foreign owner; no owner ≥ 25%; owner missing address_line1/city/country; non-positive transaction amounts. Warnings (don't block): owner without any TIN (form prints "FOREIGNUS" per IRS instructions); no reportable transactions for the year.

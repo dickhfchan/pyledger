@@ -15,6 +15,7 @@ DISCLAIMER: This module assists with form preparation and is not tax advice.
 Consult a qualified tax professional for your specific situation.
 """
 
+import hashlib
 import sqlite3
 import json
 from datetime import datetime, date, timedelta
@@ -26,6 +27,17 @@ from dataclasses import dataclass
 DISCLAIMER = (
     "This document was prepared with PyLedger software assistance. "
     "It is not tax advice. Review with a qualified tax professional before filing."
+)
+
+# The Form 1120 jurat. Accepting it is the taxpayer's personal legal act:
+# software must display it verbatim and record the acceptance, never accept
+# it on the signer's behalf.
+PERJURY_DECLARATION = (
+    "Under penalties of perjury, I declare that I have examined this "
+    "return, including accompanying schedules and statements, and to the "
+    "best of my knowledge and belief, it is true, correct, and complete. "
+    "Declaration of preparer (other than taxpayer) is based on all "
+    "information of which preparer has any knowledge."
 )
 
 # IRC §6038A(d) — flat statutory amounts, not inflation-indexed.
@@ -245,6 +257,22 @@ class Form5472Filing:
                 generated_at TEXT,
                 filed_date TEXT,
                 filing_method TEXT,
+                UNIQUE(entity_id, tax_year)
+            )
+        ''')
+
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS filing_declarations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_id INTEGER NOT NULL REFERENCES filing_entities(id),
+                tax_year INTEGER NOT NULL,
+                declaration_text TEXT NOT NULL,
+                signer_name TEXT NOT NULL,
+                signer_title TEXT NOT NULL,
+                signature_kind TEXT NOT NULL DEFAULT 'typed',
+                signed_date TEXT NOT NULL,
+                accepted_at TEXT NOT NULL,
+                files_sha256 TEXT NOT NULL,
                 UNIQUE(entity_id, tax_year)
             )
         ''')
@@ -921,6 +949,152 @@ class Form5472Filing:
             return int(formation[:4]) == tax_year
         except (ValueError, TypeError):
             return False
+
+    # ------------------------------------------------------------------
+    # Electronic signature / declaration
+    # ------------------------------------------------------------------
+
+    def _package_paths(self, entity_id: int, tax_year: int) -> Dict[str, str]:
+        """Filing package PDF paths currently on record (existing files)."""
+        c = self.conn.cursor()
+        c.execute('''
+            SELECT form_1120_path, form_5472_path, part_v_statement_path,
+                   reasonable_cause_path
+            FROM form_filings WHERE entity_id = ? AND tax_year = ?
+        ''', (entity_id, tax_year))
+        row = c.fetchone()
+        if row is None:
+            raise ValueError(
+                f"No filing found for entity {entity_id}, year {tax_year}. "
+                "Generate the filing first.")
+        keys = ("form_1120_path", "form_5472_path", "part_v_statement_path",
+                "reasonable_cause_path")
+        return {k: p for k, p in zip(keys, row) if p}
+
+    @staticmethod
+    def _sha256(path: str) -> str:
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    def sign_filing(self, entity_id: int, tax_year: int, signer_name: str,
+                    signer_title: str, signed_date: Optional[str] = None,
+                    signature_image: Optional[str] = None,
+                    user_id: str = "system") -> Dict[str, Any]:
+        """Apply an e-signature to the pro-forma 1120 and record the jurat.
+
+        The caller MUST have displayed PERJURY_DECLARATION to the signer and
+        obtained their explicit acceptance before calling this. Writes the
+        signed 1120 alongside the original, points the filing at it, and
+        stores SHA-256 hashes of every package PDF so a later transmission
+        can prove it sent exactly what was declared.
+        """
+        import os
+        from pyledger import irs_pdf
+
+        paths = self._package_paths(entity_id, tax_year)
+        if "form_1120_path" not in paths:
+            raise ValueError(
+                "This filing has no pro-forma 1120 to sign. (25%-foreign-"
+                "owned corporations sign their own Form 1120 return.)")
+
+        source_1120 = paths["form_1120_path"]
+        directory = os.path.dirname(source_1120)
+        signed_path = os.path.join(
+            directory, f"f1120_proforma_{tax_year}_signed.pdf")
+        if source_1120 == signed_path:
+            # Re-signing: start from the unsigned original if it survives,
+            # to avoid stacking signature overlays.
+            original = os.path.join(directory,
+                                    f"f1120_proforma_{tax_year}.pdf")
+            if os.path.isfile(original):
+                source_1120 = original
+
+        missing = [p for p in {**paths, "form_1120_path": source_1120}.values()
+                   if not os.path.isfile(p)]
+        if missing:
+            raise ValueError("Filing PDFs missing on disk (regenerate the "
+                             "filing): " + ", ".join(missing))
+
+        signed_date = signed_date or date.today().isoformat()
+        irs_pdf.sign_form_1120(source_1120, signed_path, signer_name,
+                               signer_title, signed_date,
+                               signature_image=signature_image)
+
+        c = self.conn.cursor()
+        c.execute('''
+            UPDATE form_filings SET form_1120_path = ?
+            WHERE entity_id = ? AND tax_year = ?
+        ''', (signed_path, entity_id, tax_year))
+
+        paths["form_1120_path"] = signed_path
+        hashes = {p: self._sha256(p) for p in paths.values()}
+        accepted_at = datetime.now().isoformat()
+        signature_kind = "image" if signature_image else "typed"
+        c.execute('''
+            INSERT INTO filing_declarations
+            (entity_id, tax_year, declaration_text, signer_name,
+             signer_title, signature_kind, signed_date, accepted_at,
+             files_sha256)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(entity_id, tax_year) DO UPDATE SET
+                declaration_text = excluded.declaration_text,
+                signer_name = excluded.signer_name,
+                signer_title = excluded.signer_title,
+                signature_kind = excluded.signature_kind,
+                signed_date = excluded.signed_date,
+                accepted_at = excluded.accepted_at,
+                files_sha256 = excluded.files_sha256
+        ''', (entity_id, tax_year, PERJURY_DECLARATION, signer_name,
+              signer_title, signature_kind, signed_date, accepted_at,
+              json.dumps(hashes)))
+        self.conn.commit()
+
+        self.log_audit_trail(
+            user_id, "DECLARATION_ACCEPTED", "filing_declarations",
+            f"{entity_id}/{tax_year}", None,
+            {"signer_name": signer_name, "signer_title": signer_title,
+             "accepted_at": accepted_at,
+             "declaration_sha256": hashlib.sha256(
+                 PERJURY_DECLARATION.encode()).hexdigest()},
+            TaxPrinciple.FILING,
+            "Signer accepted the penalty-of-perjury declaration")
+        self.log_audit_trail(
+            user_id, "FORM_SIGNED", "form_filings",
+            f"{entity_id}/{tax_year}", None,
+            {"signed_1120_path": signed_path,
+             "signature_kind": signature_kind, "files_sha256": hashes},
+            TaxPrinciple.FILING,
+            "Applied electronic signature to pro-forma Form 1120")
+
+        return {
+            "signed_1120_path": signed_path,
+            "signer_name": signer_name,
+            "signer_title": signer_title,
+            "signed_date": signed_date,
+            "signature_kind": signature_kind,
+            "accepted_at": accepted_at,
+            "files_sha256": hashes,
+            "declaration_text": PERJURY_DECLARATION,
+        }
+
+    def get_declaration(self, entity_id: int,
+                        tax_year: int) -> Optional[Dict[str, Any]]:
+        """The recorded declaration for an entity + tax year, or None."""
+        c = self.conn.cursor()
+        c.execute('''
+            SELECT * FROM filing_declarations
+            WHERE entity_id = ? AND tax_year = ?
+        ''', (entity_id, tax_year))
+        row = c.fetchone()
+        if row is None:
+            return None
+        cols = [d[0] for d in c.description]
+        record = dict(zip(cols, row))
+        record["files_sha256"] = json.loads(record["files_sha256"])
+        return record
 
     def mark_filed(self, entity_id: int, tax_year: int, filed_date: str,
                    method: str, user_id: str = "system") -> None:

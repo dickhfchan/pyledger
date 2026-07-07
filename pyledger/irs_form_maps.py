@@ -9,7 +9,7 @@ with pypdf's PdfReader.get_fields() and verified against the rendered forms.
 No third-party imports — importable everywhere, trivially testable.
 """
 
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 
 IRS_FORM_URLS: Dict[str, str] = {
@@ -175,6 +175,24 @@ FORM_1120_OVERLAY: Dict[str, Dict[str, float]] = {
     "de_banner": {"page": 0, "x": 210.0, "y": 768.0, "size": 13.0},
 }
 FORM_1120_DE_BANNER_TEXT = "Foreign-owned U.S. DE"
+
+# "Sign Here" block on page 1. The officer signature line and Date column
+# are not form fields (drawn as overlays just above the line at y≈90);
+# Title is the AcroForm field f1_58. Coordinates verified against the 2025
+# template ("Signature of officer" caption prints at x=74, y=82.4; the
+# Title field rect is [324, 90, 460.8, 102]).
+FORM_1120_SIGNATURE: Dict[str, Dict[str, Any]] = {
+    "2025": {
+        "name": {"page": 0, "x": 70.0, "y": 92.0, "size": 11.0},
+        "date": {"page": 0, "x": 282.0, "y": 92.0, "size": 8.0},
+        "title_field":
+            "topmostSubform[0].Page1[0].SignHere-ReadOrder[0].f1_58[0]",
+        "title_fallback": {"page": 0, "x": 328.0, "y": 92.0, "size": 8.0},
+        # Bounding box for an optional handwritten-signature image.
+        "image_box": {"page": 0, "x": 70.0, "y": 88.0,
+                      "w": 150.0, "h": 26.0},
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Form 7004 (Rev. December 2018, current)

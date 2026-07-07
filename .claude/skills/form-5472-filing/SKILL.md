@@ -88,9 +88,30 @@ Produces the filled Form 5472, pro-forma 1120 with the "Foreign-owned U.S. DE" b
 
 Requirements: `pypdf` and `reportlab` installed; first run downloads official IRS templates from irs.gov into `~/.pyledger/irs_forms/` (override with `--template-dir` or `PYLEDGER_IRS_TEMPLATE_DIR`). If generation raises `TemplateFieldMismatchError`, the IRS published a new form revision — see [references/filing-rules.md](references/filing-rules.md#form-revisions).
 
-### 6. After submission
+### 6. Sign (legal core — human acceptance required)
 
-Relay the returned `next_steps` (print, review, sign the 1120; DEs fax to 855-887-7737 or mail to IRS Ogden). Once the user has actually submitted, record it:
+An unsigned 1120 is legally not a filed return. Before faxing, the signer must accept the penalty-of-perjury declaration and e-sign the pro-forma 1120:
+
+```bash
+pyledger tax-5472-sign --entity-id 1 --tax-year 2025 --name "Jane Kwok" --title "Owner"
+```
+
+**NEVER accept the declaration on the user's behalf.** Display `PERJURY_DECLARATION` (from `pyledger.tax_filing`) verbatim, get the user's explicit confirmation in conversation, and only then run the command with `--accept`. The command writes `f1120_proforma_<year>_signed.pdf` (typed `/s/ Name` signature; `--signature-image sig.png` for a handwritten image), records the acceptance plus SHA-256 hashes of every package PDF in `filing_declarations`, and audit-logs `DECLARATION_ACCEPTED` / `FORM_SIGNED`. If the filing is regenerated afterwards, it must be re-signed.
+
+### 7. Submit
+
+Relay the returned `next_steps` (DEs fax to 855-887-7737 or mail to IRS Ogden). Two paths:
+
+**Fax via Notifyre (built in).** Requires `NOTIFY_API_KEY` in the environment or a `.env` file in the working directory. Refuses to send unless step 6 was completed and the files still match the signed hashes (`--unsigned` bypasses, for packages signed manually on paper). Merges the package into one PDF, sends it, and on confirmed delivery marks the filing as filed and stores the delivery receipt in `fax_transmissions` as proof of transmission:
+
+```bash
+pyledger tax-5472-fax --entity-id 1 --tax-year 2025 --wait   # defaults to the IRS fax number
+pyledger tax-fax-status --transmission-id 1                  # re-check a pending fax
+```
+
+Confirm with the user before sending — this transmits the filing to the IRS. Use `--to` to override the destination for a test fax.
+
+**Manual (mail, or fax sent elsewhere).** Once the user has actually submitted, record it:
 
 ```python
 filing.mark_filed(entity_id, tax_year, filed_date="2026-04-10", method="fax")  # or "mail"

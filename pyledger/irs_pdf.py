@@ -41,6 +41,7 @@ from pyledger.irs_form_maps import (
     FORM_1120_OVERLAY,
     FORM_1120_DE_BANNER_TEXT,
     FORM_1120_REVISION,
+    FORM_1120_SIGNATURE,
     FORM_7004_FIELDS,
     FORM_7004_REVISION,
     FORM_7004_CODE_1120,
@@ -420,6 +421,79 @@ def fill_form_1120_proforma(template: PathLike, data: Form1120ProFormaData,
                             text=FORM_1120_DE_BANNER_TEXT)]
 
     _fill_acroform(template, values, checkboxes, out, overlays=overlays)
+
+
+def sign_form_1120(pdf_path: PathLike, out: PathLike, signer_name: str,
+                   signer_title: str, date_str: str,
+                   signature_image: Optional[str] = None,
+                   revision: str = FORM_1120_REVISION) -> None:
+    """Apply an electronic signature to a filled (pro-forma) Form 1120.
+
+    Draws the signature on the "Sign Here" block of page 1: the signer's
+    typed name in the conventional /s/ notation (or a handwritten-signature
+    image if provided) above the officer signature line, the date in the
+    Date column, and the title via the Title AcroForm field (overlay
+    fallback if the field is absent, e.g. on synthetic test templates).
+
+    The e-signature itself is only the visible mark; the legal acceptance
+    of the perjury declaration is recorded by the caller (see
+    Form5472Filing.sign_filing).
+    """
+    sig = FORM_1120_SIGNATURE[revision]
+
+    reader = PdfReader(str(pdf_path))
+    writer = PdfWriter()
+    writer.append(reader)
+
+    overlays: List[OverlayItem] = []
+    if not signature_image:
+        name_spec = sig["name"]
+        overlays.append(OverlayItem(
+            page=int(name_spec["page"]), x=name_spec["x"], y=name_spec["y"],
+            size=name_spec["size"], font="Helvetica-Oblique",
+            text=f"/s/ {signer_name}"))
+    date_spec = sig["date"]
+    overlays.append(OverlayItem(
+        page=int(date_spec["page"]), x=date_spec["x"], y=date_spec["y"],
+        size=date_spec["size"], font="Helvetica", text=date_str))
+
+    fields = reader.get_fields() or {}
+    if sig["title_field"] in fields:
+        for page in writer.pages:
+            if "/Annots" in page:
+                writer.update_page_form_field_values(
+                    page, {sig["title_field"]: signer_title})
+        root = writer._root_object
+        if "/AcroForm" in root:
+            acro = root["/AcroForm"]
+            assert isinstance(acro, DictionaryObject)
+            acro[NameObject("/NeedAppearances")] = BooleanObject(True)
+    else:
+        t = sig["title_fallback"]
+        overlays.append(OverlayItem(
+            page=int(t["page"]), x=t["x"], y=t["y"], size=t["size"],
+            font="Helvetica", text=signer_title))
+
+    _merge_overlays(writer, overlays)
+
+    if signature_image:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.utils import ImageReader
+        box = sig["image_box"]
+        page = writer.pages[int(box["page"])]
+        w = float(page.mediabox.width)
+        h = float(page.mediabox.height)
+        buf = io.BytesIO()
+        c = canvas.Canvas(buf, pagesize=(w, h))
+        c.drawImage(ImageReader(signature_image), box["x"], box["y"],
+                    width=box["w"], height=box["h"],
+                    preserveAspectRatio=True, anchor="sw", mask="auto")
+        c.save()
+        buf.seek(0)
+        page.merge_page(PdfReader(buf).pages[0])
+
+    with open(out, "wb") as fh:
+        writer.write(fh)
 
 
 def fill_form_7004(template: PathLike, data: Form7004Data, out: PathLike,

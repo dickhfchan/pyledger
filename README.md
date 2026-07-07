@@ -472,6 +472,18 @@ the filing that carries a **$25,000 penalty per form per year** if missed.
 Foreign-owned DEs cannot e-file this filing; the generated package is
 print-ready for fax (855-887-7737) or mail (IRS Ogden, UT).
 
+For a fully digital submission, `pyledger tax-5472-sign` captures the
+signer's acceptance of the penalty-of-perjury declaration, e-signs the
+pro-forma 1120 (typed `/s/` name or signature image — consistent with IRS
+acceptance of e-signatures on paper-filed 1120s), and records SHA-256
+hashes tying the declaration to the exact documents. Then, with a
+[Notifyre](https://notifyre.com) API key in `NOTIFY_API_KEY` (env or `.env`),
+`pyledger tax-5472-fax --entity-id 1 --tax-year 2025 --wait` faxes the merged
+package directly to the IRS — refusing unsigned or altered packages —
+stores the delivery receipt as proof of transmission, and marks the filing
+as filed on confirmation. See
+[FAX_SERVICE_DOCUMENTATION.md](FAX_SERVICE_DOCUMENTATION.md).
+
 ### CLI
 
 ```bash
