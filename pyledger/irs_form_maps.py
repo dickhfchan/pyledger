@@ -195,33 +195,39 @@ FORM_1120_SIGNATURE: Dict[str, Dict[str, Any]] = {
 }
 
 # ---------------------------------------------------------------------------
-# Form 7004 (Rev. December 2018, current)
+# Form 7004 (Rev. December 2025)
 # ---------------------------------------------------------------------------
 
-FORM_7004_REVISION = "2018-12"
+FORM_7004_REVISION = "2025-12"
 
 _F = "topmostSubform[0].Page1[0]"
 
+# AcroForm field names verified against f7004.pdf (Rev. 12-2025) from
+# https://www.irs.gov/pub/irs-pdf/f7004.pdf — identical to the Dec 2018
+# revision; the 2025 revision adds form codes 37/35/36 (Forms 708/8924/8928).
+_FORM_7004_FIELD_NAMES: Dict[str, str] = {
+    "name": f"{_F}.f1_1[0]",
+    "identifying_number": f"{_F}.f1_2[0]",
+    "street": f"{_F}.f1_3[0]",
+    "room_suite": f"{_F}.f1_4[0]",
+    "city": f"{_F}.f1_5[0]",
+    "state": f"{_F}.f1_6[0]",
+    "country": f"{_F}.f1_7[0]",
+    "zip": f"{_F}.f1_8[0]",
+    # Part I line 1: form code, two single-character comb boxes.
+    "form_code_digit1": f"{_F}.f1_9[0]",
+    "form_code_digit2": f"{_F}.f1_10[0]",
+    # Part II line 5a: calendar year
+    "calendar_year": f"{_F}.f1_11[0]",
+    # Part II lines 6-8
+    "tentative_tax": f"{_F}.f1_16[0]",
+    "total_payments": f"{_F}.f1_17[0]",
+    "balance_due": f"{_F}.f1_18[0]",
+}
+
 FORM_7004_FIELDS: Dict[str, Dict[str, str]] = {
-    "2018-12": {
-        "name": f"{_F}.f1_1[0]",
-        "identifying_number": f"{_F}.f1_2[0]",
-        "street": f"{_F}.f1_3[0]",
-        "room_suite": f"{_F}.f1_4[0]",
-        "city": f"{_F}.f1_5[0]",
-        "state": f"{_F}.f1_6[0]",
-        "country": f"{_F}.f1_7[0]",
-        "zip": f"{_F}.f1_8[0]",
-        # Part I line 1: form code, two single-character comb boxes.
-        "form_code_digit1": f"{_F}.f1_9[0]",
-        "form_code_digit2": f"{_F}.f1_10[0]",
-        # Part II line 5a: calendar year
-        "calendar_year": f"{_F}.f1_11[0]",
-        # Part II lines 6-8
-        "tentative_tax": f"{_F}.f1_16[0]",
-        "total_payments": f"{_F}.f1_17[0]",
-        "balance_due": f"{_F}.f1_18[0]",
-    }
+    "2018-12": dict(_FORM_7004_FIELD_NAMES),
+    "2025-12": dict(_FORM_7004_FIELD_NAMES),
 }
 
 # Form 7004 Part I line 1 code for Form 1120.

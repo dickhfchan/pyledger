@@ -357,7 +357,7 @@ def synthetic_maps(tmp_path, monkeypatch):
         [v[0] for v in cmap_1120.values()])
 
     # --- f7004
-    fmap_7004 = irs_form_maps.FORM_7004_FIELDS["2018-12"]
+    fmap_7004 = irs_form_maps.FORM_7004_FIELDS[irs_form_maps.FORM_7004_REVISION]
     _build_synthetic_template(tmp_path / "f7004.pdf",
                               list(fmap_7004.values()), [])
 
@@ -421,14 +421,14 @@ class TestPdfGeneration:
     def test_fill_7004(self, tmp_path, synthetic_maps, filing, de_entity):
         from pypdf import PdfReader
         from pyledger import irs_pdf
-        from pyledger.irs_form_maps import FORM_7004_FIELDS
+        from pyledger.irs_form_maps import FORM_7004_FIELDS, FORM_7004_REVISION
 
         entity = filing.get_entity(de_entity)
         data = irs_pdf.Form7004Data(entity=entity, tax_year=2025)
         out = tmp_path / "out_7004.pdf"
         irs_pdf.fill_form_7004(synthetic_maps / "f7004.pdf", data, out)
         fields = PdfReader(str(out)).get_fields()
-        fmap = FORM_7004_FIELDS["2018-12"]
+        fmap = FORM_7004_FIELDS[FORM_7004_REVISION]
         assert fields[fmap["form_code_digit1"]].get("/V") == "1"
         assert fields[fmap["form_code_digit2"]].get("/V") == "2"
         assert fields[fmap["tentative_tax"]].get("/V") == "0"

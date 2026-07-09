@@ -56,7 +56,7 @@ If the entity has no EIN, it must apply with Form SS-4 before filing — there i
 
 ## Form revisions
 
-Field maps in `pyledger/irs_form_maps.py` are pinned to specific IRS revisions: Form 5472 Rev. Dec 2023, Form 1120 (2025), Form 7004 Rev. Dec 2018. Templates are downloaded from `https://www.irs.gov/pub/irs-pdf/` on first use and cached in `~/.pyledger/irs_forms/` (override: `PYLEDGER_IRS_TEMPLATE_DIR` env var, `--template-dir` flag, or `template_dir=` argument).
+Field maps in `pyledger/irs_form_maps.py` are pinned to specific IRS revisions: Form 5472 Rev. Dec 2023, Form 1120 (2025), Form 7004 Rev. Dec 2025. Templates are downloaded from `https://www.irs.gov/pub/irs-pdf/` on first use and cached in `~/.pyledger/irs_forms/` (override: `PYLEDGER_IRS_TEMPLATE_DIR` env var, `--template-dir` flag, or `template_dir=` argument).
 
 - A SHA256 mismatch against `EXPECTED_SHA256` logs a **warning** only — the IRS republishes PDFs without structural changes.
 - A `TemplateFieldMismatchError` means the AcroForm field names changed (a real new revision). Fix: dump the new field names with `pypdf.PdfReader(path).get_fields()`, add a new revision entry to the field-map dicts in `irs_form_maps.py`, update `FORM_*_REVISION` and `EXPECTED_SHA256`, and verify against the rendered PDF.
